@@ -227,4 +227,3 @@
 .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
 .animate-rotate-slow { animation: rotate-slow 40s linear infinite; }
 .animate-reveal-card { animation: reveal-card 0.9s cubic-bezier(.2,.7,.2,1) both; }
-}
