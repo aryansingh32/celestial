@@ -13,6 +13,12 @@ export type ReadingSections = {
   luckyNumber: string;
   luckyDay: string;
   summary: string;
+  childrenCount: string;
+  childrenNote: string;
+  relationship: string;
+  companionInitial: string;
+  companionNote: string;
+  lifeGraph: number[]; // 8 values 0-100 across life decades
 };
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -122,6 +128,31 @@ export function generateFallbackReading(seed?: number): ReadingSections {
   const num = luckyNumber();
   const day = pick(days);
   const summary = `A season of quiet realignment: your palm suggests strength, tender love, and a career that is finally catching up to your vision.`;
+  const childrenOptions = ["1", "2", "3"];
+  const childrenCount = pick(childrenOptions);
+  const childrenNotes = [
+    "A gentle, curious soul — likely to arrive when your life feels most settled.",
+    "Little laughter is written softly into your palm's future.",
+    "Your children line is warm and bright, suggesting a joyful, close-knit family.",
+    "A creative, sensitive child may bring you the deepest kind of love.",
+  ];
+  const relationships = [
+    "Your relationship line points to a slow-blooming, deeply loyal bond — not loud, but unshakably true.",
+    "You are being prepared for a partnership that feels like coming home rather than chasing.",
+    "A soul is being drawn toward you now; the meeting will feel oddly familiar.",
+    "Your palm suggests one great, defining love — patient, steady, and quietly transformative.",
+  ];
+  const letters = ["A","S","R","M","J","K","N","D","L","V","E","H"];
+  const companionInitial = pick(letters);
+  const companionNotes = [
+    "Someone whose name begins with this letter is quietly walking toward your life.",
+    "This initial keeps appearing on your palm — a companion who will stay till the very end.",
+    "A person carrying this letter will become the steadiest presence of your life.",
+    "The heart line whispers this letter — a lifelong companion of rare devotion.",
+  ];
+  // Build a smooth, mostly-rising life graph (0..100)
+  const base = [30, 42, 55, 62, 70, 78, 84, 88];
+  const lifeGraph = base.map((v) => Math.max(15, Math.min(98, Math.round(v + (Math.random() * 18 - 9)))));
   return {
     personality: p,
     love: l,
@@ -134,6 +165,12 @@ export function generateFallbackReading(seed?: number): ReadingSections {
     luckyNumber: num,
     luckyDay: day,
     summary,
+    childrenCount,
+    childrenNote: pick(childrenNotes),
+    relationship: pick(relationships),
+    companionInitial,
+    companionNote: pick(companionNotes),
+    lifeGraph,
   };
 }
 
