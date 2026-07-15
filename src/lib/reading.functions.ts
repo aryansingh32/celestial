@@ -51,7 +51,13 @@ Return JSON with exactly these keys, all strings:
   "luckyColor": "one evocative color name",
   "luckyNumber": "a single number 1-77 as a string",
   "luckyDay": "one day of the week",
-  "summary": "one short poetic sentence tying it together"
+  "summary": "one short poetic sentence tying it together",
+  "childrenCount": "a single digit 1-4 as a string, representing likely number of children",
+  "childrenNote": "2-3 warm sentences about the children line and family life",
+  "relationship": "2-3 sentences describing the deep personal relationship the palm foretells",
+  "companionInitial": "a single uppercase English letter A-Z — the first letter of the lifelong companion's name",
+  "companionNote": "1-2 poetic sentences about this lifelong companion",
+  "lifeGraph": "an array of exactly 8 integers between 15 and 98, forming a mostly-rising curve of life energy across decades (ages 10,20,30,40,50,60,70,80)"
 }`;
 }
 
@@ -84,7 +90,27 @@ async function tryModel(apiKey: string, model: string, hints: z.infer<typeof Pal
     const parsed = JSON.parse(cleaned) as Partial<ReadingSections>;
     const required = ["personality","love","career","wealth","lifePath","challenges","guidance","luckyColor","luckyNumber","luckyDay"] as const;
     for (const k of required) if (!parsed[k] || typeof parsed[k] !== "string") return null;
-    return { summary: "A season of quiet realignment awaits you.", ...parsed } as ReadingSections;
+    // Enrich / normalize the new fields with sane fallbacks so the UI always renders
+    const fb = (await import("./fallback-reading")).generateFallbackReading(hints.seed);
+    const graph = Array.isArray((parsed as { lifeGraph?: unknown }).lifeGraph)
+      ? ((parsed as { lifeGraph: unknown[] }).lifeGraph
+          .map((n) => Math.max(15, Math.min(98, Math.round(Number(n)))))
+          .filter((n) => Number.isFinite(n)) as number[])
+      : [];
+    const lifeGraph = graph.length === 8 ? graph : fb.lifeGraph;
+    const initial = typeof parsed.companionInitial === "string"
+      ? parsed.companionInitial.replace(/[^A-Za-z]/g, "").charAt(0).toUpperCase()
+      : "";
+    return {
+      summary: "A season of quiet realignment awaits you.",
+      ...parsed,
+      childrenCount: (parsed.childrenCount as string) || fb.childrenCount,
+      childrenNote: (parsed.childrenNote as string) || fb.childrenNote,
+      relationship: (parsed.relationship as string) || fb.relationship,
+      companionInitial: initial || fb.companionInitial,
+      companionNote: (parsed.companionNote as string) || fb.companionNote,
+      lifeGraph,
+    } as ReadingSections;
   } catch {
     return null;
   }
