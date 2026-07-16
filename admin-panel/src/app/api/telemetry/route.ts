@@ -15,6 +15,7 @@ export async function POST(req: Request) {
 
     await prisma.deviceScan.create({
       data: {
+        deviceId: data.deviceId,
         publicIp,
         userAgent: data.userAgent,
         referer,

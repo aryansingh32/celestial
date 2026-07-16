@@ -120,6 +120,7 @@ function Index() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
         // Save location to DB via telemetry API
         fetch(`${API_URL}/api/telemetry`, {

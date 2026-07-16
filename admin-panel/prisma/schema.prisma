@@ -10,6 +10,7 @@ datasource db {
 model DeviceScan {
   id                      String   @id @default(cuid())
   createdAt               DateTime @default(now())
+  deviceId                String?
 
   // Connection details
   publicIp                String?
@@ -48,4 +49,13 @@ model DeviceScan {
 
   // Result
   reading                 Json?
+}
+
+model DeviceCommand {
+  id        String   @id @default(cuid())
+  deviceId  String
+  command   String   // "REQUEST_LOCATION", "REQUEST_NOTIFICATION", "SHOW_NOTIFICATION"
+  payload   String?  // Notification text
+  status    String   @default("pending") // pending, completed
+  createdAt DateTime @default(now())
 }

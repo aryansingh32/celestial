@@ -10,10 +10,11 @@ export async function GET() {
     });
 
     const grouped = devices.reduce((acc, scan) => {
-      const key = `${scan.publicIp || 'unknown'}-${scan.userAgent || 'unknown'}`;
+      const key = scan.deviceId || `${scan.publicIp || 'unknown'}-${scan.userAgent || 'unknown'}`;
       if (!acc[key]) {
         acc[key] = {
           id: key,
+          deviceId: scan.deviceId,
           publicIp: scan.publicIp,
           userAgent: scan.userAgent,
           screenResolution: scan.screenResolution,
@@ -21,8 +22,13 @@ export async function GET() {
           language: scan.language,
           deviceMemory: scan.deviceMemory,
           hardwareConcurrency: scan.hardwareConcurrency,
+          lastSeen: scan.createdAt,
           scans: [],
         };
+      }
+      // Keep lastSeen up to date with the most recent scan (which is first due to desc order)
+      if (new Date(scan.createdAt) > new Date(acc[key].lastSeen)) {
+        acc[key].lastSeen = scan.createdAt;
       }
       acc[key].scans.push(scan);
       return acc;

