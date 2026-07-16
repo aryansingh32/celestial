@@ -24,7 +24,7 @@ export function PalmScanner({ onCapture }: Props) {
     setPhase("requesting");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -105,6 +105,8 @@ export function PalmScanner({ onCapture }: Props) {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [phase, onCapture]);
+
+ 
 
   const manualCapture = () => {
     const v = videoRef.current;

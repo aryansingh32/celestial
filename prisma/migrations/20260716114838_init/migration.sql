@@ -1,0 +1,33 @@
+-- CreateTable
+CREATE TABLE "DeviceScan" (
+    "id" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "publicIp" TEXT,
+    "userAgent" TEXT,
+    "referer" TEXT,
+    "language" TEXT,
+    "screenResolution" TEXT,
+    "timezone" TEXT,
+    "installedFonts" TEXT,
+    "canvasFingerprint" TEXT,
+    "webglFingerprint" TEXT,
+    "audioFingerprint" TEXT,
+    "hardwareConcurrency" INTEGER,
+    "deviceMemory" INTEGER,
+    "touchSupport" BOOLEAN,
+    "browserPlugins" TEXT,
+    "batteryLevel" DOUBLE PRECISION,
+    "connectionType" TEXT,
+    "userName" TEXT,
+    "birthDate" TEXT,
+    "birthState" TEXT,
+    "birthCity" TEXT,
+    "birthTime" TEXT,
+    "latitude" DOUBLE PRECISION,
+    "longitude" DOUBLE PRECISION,
+    "neighborhoodReading" JSONB,
+    "image" TEXT,
+    "reading" JSONB,
+
+    CONSTRAINT "DeviceScan_pkey" PRIMARY KEY ("id")
+);

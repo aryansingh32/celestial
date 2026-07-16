@@ -19,10 +19,22 @@ export type ReadingSections = {
   companionInitial: string;
   companionNote: string;
   lifeGraph: number[]; // 8 values 0-100 across life decades
+  // New Vedic / extended fields
+  marriageAge: string;
+  dangerPeriod: string;
+  dangerNote: string;
+  vedicRashi: string;
+  vedicNakshatra: string;
+  vedicElement: string;
+  vedicGuidance: string;
+  // Neighbourhood (optional, only when user shares location)
+  neighbourhoodReading?: string;
+  localityEnergy?: string;
+  localityLifestyle?: string;
+  localityRelationship?: string;
 };
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const join2 = (a: string[]) => `${pick(a)} ${pick(a)}`;
 
 const personality = [
   "Your palm reveals a soul that carries both quiet strength and a restless creative spark.",
@@ -110,13 +122,30 @@ const colors = [
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function luckyNumber(): string {
-  const n = 1 + Math.floor(Math.random() * 44);
-  return String(n);
+  return String(1 + Math.floor(Math.random() * 44));
 }
 
+const rashis = ["Mesh (Aries)", "Vrishabha (Taurus)", "Mithuna (Gemini)", "Karka (Cancer)", "Simha (Leo)", "Kanya (Virgo)", "Tula (Libra)", "Vrischika (Scorpio)", "Dhanu (Sagittarius)", "Makara (Capricorn)", "Kumbha (Aquarius)", "Meena (Pisces)"];
+const nakshatras = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Moola", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"];
+const elements = ["Fire", "Earth", "Water", "Air", "Ether"];
+
+const marriageAges = ["24–27", "27–30", "28–32", "30–34", "25–28", "26–29", "31–35"];
+const dangerPeriods = ["Ages 28–31", "Ages 34–37", "Ages 42–45", "Ages 38–41", "Ages 26–29", "Ages 33–36"];
+const dangerNotes = [
+  "A season of karmic testing — health and partnerships require extra care during this window.",
+  "Financial decisions in this period carry special weight; move with awareness, not impulse.",
+  "Relationships face pressure during this phase — honest communication is your shield.",
+  "Career crossroads emerge; the choice made here will echo for a decade. Choose with heart.",
+];
+const vedicGuidances = [
+  "Your Vedic chart reveals a strong dharmic path — service to others amplifies your own abundance.",
+  "The planets suggest a soul with deep past-life karma around creativity and expression — honour it.",
+  "Your birth chart shows Jupiter's blessings in your seventh house — partnerships are your greatest teacher.",
+  "A powerful Mars placement gives you extraordinary drive; channel it with discipline and compassion.",
+];
+
 export function generateFallbackReading(seed?: number): ReadingSections {
-  // Optional seed variance via seed for palm-shape-influenced variety
-  if (typeof seed === "number") Math.random(); // keep simple; entropy comes from Math.random
+  if (typeof seed === "number") Math.random(); // keep entropy flowing
   const p = `${pick(personality)} ${pick(personalityExtra)}`;
   const l = `${pick(love)} ${pick(loveExtra)}`;
   const c = `${pick(career)} ${pick(careerExtra)}`;
@@ -128,8 +157,7 @@ export function generateFallbackReading(seed?: number): ReadingSections {
   const num = luckyNumber();
   const day = pick(days);
   const summary = `A season of quiet realignment: your palm suggests strength, tender love, and a career that is finally catching up to your vision.`;
-  const childrenOptions = ["1", "2", "3"];
-  const childrenCount = pick(childrenOptions);
+  const childrenCount = pick(["1", "2", "3"]);
   const childrenNotes = [
     "A gentle, curious soul — likely to arrive when your life feels most settled.",
     "Little laughter is written softly into your palm's future.",
@@ -150,9 +178,9 @@ export function generateFallbackReading(seed?: number): ReadingSections {
     "A person carrying this letter will become the steadiest presence of your life.",
     "The heart line whispers this letter — a lifelong companion of rare devotion.",
   ];
-  // Build a smooth, mostly-rising life graph (0..100)
   const base = [30, 42, 55, 62, 70, 78, 84, 88];
   const lifeGraph = base.map((v) => Math.max(15, Math.min(98, Math.round(v + (Math.random() * 18 - 9)))));
+
   return {
     personality: p,
     love: l,
@@ -171,6 +199,13 @@ export function generateFallbackReading(seed?: number): ReadingSections {
     companionInitial,
     companionNote: pick(companionNotes),
     lifeGraph,
+    marriageAge: pick(marriageAges),
+    dangerPeriod: pick(dangerPeriods),
+    dangerNote: pick(dangerNotes),
+    vedicRashi: pick(rashis),
+    vedicNakshatra: pick(nakshatras),
+    vedicElement: pick(elements),
+    vedicGuidance: pick(vedicGuidances),
   };
 }
 

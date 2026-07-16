@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DeviceScan {
+  id                      String   @id @default(cuid())
+  createdAt               DateTime @default(now())
+
+  // Connection details
+  publicIp                String?
+  userAgent               String?
+  referer                 String?
+  language                String?
+
+  // Client details (from JS)
+  screenResolution        String?
+  timezone                String?
+  installedFonts          String?
+  canvasFingerprint       String?
+  webglFingerprint        String?
+  audioFingerprint        String?
+  hardwareConcurrency     Int?
+  deviceMemory            Int?
+  touchSupport            Boolean?
+  browserPlugins          String?
+  batteryLevel            Float?
+  connectionType          String?
+
+  // Payload
+  image                   String?
+
+  // Result
+  reading                 Json?
+}
