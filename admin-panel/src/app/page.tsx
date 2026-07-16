@@ -155,6 +155,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const sendCommand = async (command: string, payload?: string) => {
+    if (!selectedDevice?.deviceId) {
+      alert("This device is running an older version and does not support commands. Please wait for them to reconnect.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: selectedDevice.deviceId, command, payload })
+      });
+      if (res.ok) alert("Command queued successfully. It will execute on the device within 5 seconds if they are online.");
+    } catch (e) {
+      alert("Failed to queue command.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0a0a0f] text-white">
