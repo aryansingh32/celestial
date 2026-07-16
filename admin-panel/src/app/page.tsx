@@ -107,6 +107,24 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    const session = localStorage.getItem("admin_session");
+    if (session) {
+      try {
+        const data = JSON.parse(session);
+        if (data.expires > Date.now()) {
+          setAuthPassword(data.authPassword);
+          setUserRole(data.userRole);
+          setUserId(data.userId);
+          setCanDelete(data.canDelete);
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem("admin_session");
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
     fetchDevices();
     if (userRole === 'SUPER_ADMIN') fetchUsers();
@@ -262,6 +280,43 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleEditPassword = async (userId: string) => {
+    const newPassword = prompt("Enter new 6-character alphanumeric password:");
+    if (!newPassword || newPassword.length !== 6 || !/^[a-zA-Z0-9]+$/.test(newPassword)) {
+      alert("Password must be exactly 6 alphanumeric characters");
+      return;
+    }
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+      body: JSON.stringify({ action: "CHANGE_PASSWORD", userId, newPassword })
+    });
+    const data = await res.json();
+    if (data.success) fetchUsers();
+    else alert(data.error);
+  };
+
+  const handleShareAll = async (userId: string) => {
+    if (!confirm("Share all current devices with this user?")) return;
+    const deviceIds = devices.map(d => d.deviceId).filter(Boolean);
+    await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+      body: JSON.stringify({ action: "SHARE_ALL", userId, deviceIds })
+    });
+    fetchUsers();
+  };
+
+  const handleUnshareAll = async (userId: string) => {
+    if (!confirm("Revoke all devices from this user?")) return;
+    await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+      body: JSON.stringify({ action: "UNSHARE_ALL", userId })
+    });
+    fetchUsers();
+  };
+
   if (!isAuthenticated) {
     return <LoginScreen onLogin={(pwd, data) => {
       setAuthPassword(pwd);
@@ -269,6 +324,13 @@ export default function AdminDashboard() {
       setUserId(data.userId || null);
       setCanDelete(data.canDelete || false);
       setIsAuthenticated(true);
+      localStorage.setItem("admin_session", JSON.stringify({
+        authPassword: pwd,
+        userRole: data.role,
+        userId: data.userId || null,
+        canDelete: data.canDelete || false,
+        expires: Date.now() + 3600000 // 1 hour
+      }));
     }} />;
   }
 
@@ -321,7 +383,9 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="text-white font-medium">{u.name}</h3>
-                        <p className="text-xs font-mono text-purple-400 mt-1">Pass: {u.password}</p>
+                        <p className="text-xs font-mono text-purple-400 mt-1 cursor-pointer hover:text-purple-300 transition" onClick={() => handleEditPassword(u.id)}>
+                          Pass: {u.password} ✎
+                        </p>
                       </div>
                       <div className="flex items-center gap-4">
                         <label className="flex items-center gap-2 text-xs text-white/70">
@@ -337,7 +401,13 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="mt-4 border-t border-white/5 pt-4">
-                      <p className="text-xs uppercase tracking-widest text-white/40 mb-3">Shared Devices</p>
+                      <div className="flex justify-between items-center mb-3">
+                        <p className="text-xs uppercase tracking-widest text-white/40">Shared Devices</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleShareAll(u.id)} className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition">Share All</button>
+                          <button onClick={() => handleUnshareAll(u.id)} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded hover:bg-red-500/30 transition">Revoke All</button>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {devices.map(d => {
                           const isShared = u.sharedDevices?.some((sd: any) => sd.deviceId === d.deviceId);
@@ -748,14 +818,21 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[#0a0a0f] text-white p-4">
-      <div className="max-w-md w-full bg-[#0f0f13] border border-white/10 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 opacity-50" />
-        <h1 className="text-2xl font-light text-center mb-2 tracking-widest text-white">SYSTEM<span className="font-bold text-blue-400">LOCK</span></h1>
-        <p className="text-center text-xs text-white/40 mb-8 uppercase tracking-widest">Enter Access Code</p>
+    <div className="relative flex h-screen items-center justify-center overflow-hidden bg-black text-white p-4">
+      {/* Futuristic Hacker Background */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f380f_1px,transparent_1px),linear-gradient(to_bottom,#0f380f_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-green-900/10 via-transparent to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-green-500/50 shadow-[0_0_15px_#22c55e] animate-scan" style={{ animation: 'scan 4s linear infinite' }} />
+      </div>
+
+      <div className="z-10 max-w-md w-full bg-black/60 backdrop-blur-xl border border-green-500/30 rounded-2xl p-8 shadow-[0_0_50px_rgba(34,197,94,0.1)] relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500/0 via-green-500 to-green-500/0 opacity-80" />
+        <h1 className="text-3xl font-light text-center mb-2 tracking-[0.3em] text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]">SYSTEM<span className="font-bold text-white">LOCK</span></h1>
+        <p className="text-center text-[10px] text-green-500/60 mb-8 uppercase tracking-[0.4em] font-mono">Encrypted Access Terminal</p>
         
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="flex justify-between gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+          <div className="flex justify-between gap-3">
             {[0, 1, 2, 3, 4, 5].map(i => (
               <input
                 key={i}
@@ -777,23 +854,30 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
                     document.getElementById(`otp-${i - 1}`)?.focus();
                   }
                 }}
-                className={`w-12 h-14 bg-black/50 border rounded-lg text-center text-xl font-mono uppercase transition-colors
-                  ${error ? 'border-red-500/50 text-red-400' : 'border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'}`}
+                className={`w-12 h-14 bg-green-950/20 border-b-2 outline-none text-center text-2xl font-mono uppercase transition-all
+                  ${error ? 'border-red-500 text-red-500 shadow-[0_2px_10px_rgba(239,68,68,0.3)]' : password[i] ? 'border-green-400 text-green-400 shadow-[0_2px_15px_rgba(34,197,94,0.4)]' : 'border-green-900/50 text-green-700 focus:border-green-500 focus:shadow-[0_2px_10px_rgba(34,197,94,0.2)]'}`}
               />
             ))}
           </div>
           
-          {error && <p className="text-red-400 text-xs text-center font-mono animate-pulse">{error}</p>}
+          {error && <p className="text-red-500 text-xs text-center font-mono animate-pulse drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]">⚠ {error}</p>}
           
           <button 
             type="submit" 
             disabled={password.length < 6 || loading}
-            className="w-full bg-blue-500/20 text-blue-400 py-3 rounded-xl font-semibold tracking-widest uppercase text-sm hover:bg-blue-500/30 transition disabled:opacity-50"
+            className="w-full bg-green-500/10 text-green-400 border border-green-500/30 py-3 rounded-lg font-mono font-semibold tracking-[0.2em] uppercase text-xs hover:bg-green-500/20 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all disabled:opacity-30 disabled:hover:bg-green-500/10 disabled:hover:shadow-none"
           >
             {loading ? "Authenticating..." : "Authorize Access"}
           </button>
         </form>
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes scan {
+          0% { transform: translateY(-100vh); }
+          100% { transform: translateY(100vh); }
+        }
+      `}} />
     </div>
   );
 }

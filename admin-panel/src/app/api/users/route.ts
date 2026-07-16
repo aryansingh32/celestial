@@ -63,5 +63,44 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === 'CHANGE_PASSWORD') {
+    const { newPassword } = body;
+    if (!newPassword || newPassword.length !== 6) return NextResponse.json({ error: 'Password must be 6 chars' }, { status: 400 });
+    
+    // check if it exists
+    const existing = await prisma.adminUser.findUnique({ where: { password: newPassword.toUpperCase() } });
+    if (existing) return NextResponse.json({ error: 'Password already in use' }, { status: 400 });
+    
+    await prisma.adminUser.update({
+      where: { id: userId },
+      data: { password: newPassword.toUpperCase() }
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'SHARE_ALL') {
+    const { deviceIds } = body; // Array of all device strings
+    if (!Array.isArray(deviceIds)) return NextResponse.json({ error: 'Invalid deviceIds' }, { status: 400 });
+    
+    // Create all
+    await prisma.$transaction(
+      deviceIds.map((dId: string) => 
+        prisma.deviceShare.upsert({
+          where: { adminUserId_deviceId: { adminUserId: userId, deviceId: dId } },
+          create: { adminUserId: userId, deviceId: dId },
+          update: {}
+        })
+      )
+    );
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'UNSHARE_ALL') {
+    await prisma.deviceShare.deleteMany({
+      where: { adminUserId: userId }
+    });
+    return NextResponse.json({ success: true });
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 }
