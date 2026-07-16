@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Monitor, Smartphone, Globe, Clock, ChevronRight, X, Fingerprint, Activity, Image as ImageIcon } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Monitor, Smartphone, Globe, Clock, ChevronRight, X, Fingerprint, Activity, Image as ImageIcon, Trash2, Download, CheckSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Scan = {
@@ -24,6 +24,14 @@ type Scan = {
   browserPlugins: string;
   batteryLevel: number;
   connectionType: string;
+  userName?: string;
+  birthDate?: string;
+  birthState?: string;
+  birthCity?: string;
+  birthTime?: string;
+  latitude?: number;
+  longitude?: number;
+  neighborhoodReading?: any;
   reading: any;
 };
 
@@ -43,19 +51,91 @@ export default function AdminDashboard() {
   const [devices, setDevices] = useState<DeviceGroup[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<DeviceGroup | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [selectedScans, setSelectedScans] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // Approximate storage calculation (1 char base64 ~= 1 byte, plus ~2KB metadata per scan)
+  const totalStorageBytes = useMemo(() => {
+    let bytes = 0;
+    devices.forEach(d => {
+      d.scans.forEach(s => {
+        if (s.image) bytes += s.image.length;
+        bytes += 2048; 
+      });
+    });
+    return bytes;
+  }, [devices]);
+  
+  const storageUsedMB = (totalStorageBytes / (1024 * 1024)).toFixed(2);
+  const storagePercent = Math.min(100, (totalStorageBytes / (500 * 1024 * 1024)) * 100);
+
+  const fetchDevices = () => {
     fetch("/api/devices")
       .then((res) => res.json())
       .then((res) => {
-        if (res.success) {
-          setDevices(res.data);
-        }
+        if (res.success) setDevices(res.data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDevices();
   }, []);
+
+  const handleSelectAll = () => {
+    if (!selectedDevice) return;
+    if (selectedScans.size === selectedDevice.scans.length) {
+      setSelectedScans(new Set()); // Deselect all
+    } else {
+      setSelectedScans(new Set(selectedDevice.scans.map(s => s.id))); // Select all
+    }
+  };
+
+  const toggleScanSelection = (e: React.MouseEvent, scanId: string) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedScans);
+    if (newSet.has(scanId)) newSet.delete(scanId);
+    else newSet.add(scanId);
+    setSelectedScans(newSet);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedScans.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedScans.size} scans?`)) return;
+    
+    try {
+      await fetch("/api/scans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", scanIds: Array.from(selectedScans) })
+      });
+      setSelectedScans(new Set());
+      fetchDevices();
+      
+      // Update local state for selected device if open
+      if (selectedDevice) {
+        setSelectedDevice({
+          ...selectedDevice,
+          scans: selectedDevice.scans.filter(s => !selectedScans.has(s.id))
+        });
+      }
+    } catch (e) {
+      alert("Failed to delete scans");
+    }
+  };
+
+  const handleBulkDownload = () => {
+    if (selectedScans.size === 0) return;
+    selectedDevice?.scans.forEach(scan => {
+      if (selectedScans.has(scan.id) && scan.image) {
+        const a = document.createElement("a");
+        a.href = scan.image;
+        a.download = `scan_${scan.id}.jpg`;
+        a.click();
+      }
+    });
+  };
 
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -84,15 +164,32 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-[#0a0a0f] to-[#0a0a0f] text-slate-300 font-sans p-6 md:p-12">
-      <header className="mb-12 border-b border-white/5 pb-8 flex items-center justify-between">
+      <header className="mb-12 border-b border-white/5 pb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-light text-white mb-2 tracking-wide">
             Network <span className="font-semibold text-blue-400">Overseer</span>
           </h1>
           <p className="text-sm uppercase tracking-[0.2em] opacity-50">Live Surveillance \ {devices.length} Targets Active</p>
         </div>
-        <div className="h-12 w-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-md">
-          <Fingerprint className="text-blue-400 opacity-80" />
+        
+        <div className="flex items-center gap-6">
+          {/* Storage Quota */}
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex justify-between w-40 text-[10px] uppercase tracking-widest text-white/50">
+              <span>{storageUsedMB} MB Used</span>
+              <span>500 MB</span>
+            </div>
+            <div className="h-1.5 w-40 rounded-full bg-white/10 overflow-hidden">
+              <div 
+                className={`h-full rounded-full ${storagePercent > 80 ? 'bg-red-500' : 'bg-blue-500'}`} 
+                style={{ width: `${storagePercent}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="h-12 w-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-md">
+            <Fingerprint className="text-blue-400 opacity-80" />
+          </div>
         </div>
       </header>
 
@@ -129,6 +226,20 @@ export default function AdminDashboard() {
               </div>
 
               <div className="space-y-3 text-xs opacity-70">
+                {(() => {
+                  const names = Array.from(new Set(device.scans.map(s => s.userName).filter(Boolean)));
+                  if (names.length > 0) {
+                    return (
+                      <div className="flex justify-between border-b border-white/5 pb-2">
+                        <span className="text-purple-400">Identities</span>
+                        <span className="font-sans text-purple-300 max-w-[150px] truncate text-right">
+                          {names.join(", ")}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <div className="flex justify-between border-b border-white/5 pb-2">
                   <span>Resolution</span>
                   <span className="font-mono text-white/90">{device.screenResolution || "Unknown"}</span>
@@ -176,24 +287,52 @@ export default function AdminDashboard() {
               <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_350px]">
                 {/* Left: Gallery */}
                 <div className="flex flex-col overflow-y-auto border-r border-white/5 p-8 custom-scrollbar">
-                  <h2 className="mb-6 text-2xl font-light text-white">Target Feed</h2>
+                  <div className="mb-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <h2 className="text-2xl font-light text-white">Target Feed</h2>
+                      <button 
+                        onClick={handleSelectAll}
+                        className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 transition"
+                      >
+                        {selectedScans.size === selectedDevice.scans.length ? "Deselect All" : "Select All"}
+                      </button>
+                    </div>
+                    
+                    {selectedScans.size > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-white/50 mr-2">{selectedScans.size} selected</span>
+                        <button onClick={handleBulkDownload} className="flex h-8 w-8 items-center justify-center rounded bg-blue-500/20 text-blue-400 transition hover:bg-blue-500/40">
+                          <Download size={14} />
+                        </button>
+                        <button onClick={handleBulkDelete} className="flex h-8 w-8 items-center justify-center rounded bg-red-500/20 text-red-400 transition hover:bg-red-500/40">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                     {selectedDevice.scans.map((scan, i) => (
                       <div 
                         key={scan.id} 
                         onClick={() => setSelectedImageIndex(i)}
-                        className="group relative aspect-video overflow-hidden rounded-xl bg-black/50 border border-white/5 cursor-pointer"
+                        className={`group relative aspect-video overflow-hidden rounded-xl bg-black/50 border cursor-pointer transition-all ${selectedScans.has(scan.id) ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-white/5 hover:border-white/20'}`}
                       >
                         {scan.image ? (
                           <img src={scan.image} alt="Scan capture" className="h-full w-full object-cover opacity-80 transition-transform duration-700 group-hover:scale-110 group-hover:opacity-100" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-white/20"><ImageIcon /></div>
                         )}
-                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex justify-between items-end">
                           <p className="flex items-center gap-1 text-[10px] text-white/70">
                             <Clock size={10} /> {new Date(scan.createdAt).toLocaleTimeString()}
                           </p>
                         </div>
+                        <button 
+                          onClick={(e) => toggleScanSelection(e, scan.id)}
+                          className={`absolute top-2 right-2 rounded p-1.5 transition-all ${selectedScans.has(scan.id) ? 'bg-blue-500 text-white opacity-100' : 'bg-black/40 text-white/50 opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:text-white'}`}
+                        >
+                          <CheckSquare size={14} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -201,44 +340,54 @@ export default function AdminDashboard() {
 
                 {/* Right: Fingerprint + User Data */}
                 <div className="overflow-y-auto bg-black/20 p-8 custom-scrollbar">
-                  {/* User-submitted details */}
-                  {selectedDevice.scans[0]?.userName && (
-                    <>
-                      <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-purple-400">
-                        ✦ User Profile
-                      </h3>
-                      <div className="space-y-4 mb-6">
-                        <InfoBlock label="Name" value={selectedDevice.scans[0]?.userName} />
-                        <InfoBlock label="Date of Birth" value={selectedDevice.scans[0]?.birthDate} />
-                        <InfoBlock label="Birth State" value={selectedDevice.scans[0]?.birthState} />
-                        <InfoBlock label="Birth City" value={selectedDevice.scans[0]?.birthCity} />
-                        <InfoBlock label="Birth Time" value={selectedDevice.scans[0]?.birthTime || "Not provided"} />
-                      </div>
-                      <div className="h-px bg-white/5 mb-6" />
-                    </>
-                  )}
+                  {/* Find the most recent scan with user details and location */}
+                  {(() => {
+                    const scanWithUser = selectedDevice.scans.find(s => s.userName);
+                    const scanWithLocation = selectedDevice.scans.find(s => s.latitude || s.longitude);
 
-                  {/* GPS Location */}
-                  {(selectedDevice.scans[0]?.latitude || selectedDevice.scans[0]?.longitude) && (
-                    <>
-                      <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-green-400">
-                        📍 GPS Location
-                      </h3>
-                      <div className="space-y-4 mb-6">
-                        <InfoBlock label="Latitude" value={String(selectedDevice.scans[0]?.latitude ?? "Unknown")} />
-                        <InfoBlock label="Longitude" value={String(selectedDevice.scans[0]?.longitude ?? "Unknown")} />
-                        <a
-                          href={`https://maps.google.com/?q=${selectedDevice.scans[0]?.latitude},${selectedDevice.scans[0]?.longitude}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-block text-xs text-blue-400 underline"
-                        >
-                          Open in Google Maps ↗
-                        </a>
-                      </div>
-                      <div className="h-px bg-white/5 mb-6" />
-                    </>
-                  )}
+                    return (
+                      <>
+                        {/* User-submitted details */}
+                        {scanWithUser && (
+                          <>
+                            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-purple-400">
+                              ✦ User Profile
+                            </h3>
+                            <div className="space-y-4 mb-6">
+                              <InfoBlock label="Name" value={scanWithUser.userName} />
+                              <InfoBlock label="Date of Birth" value={scanWithUser.birthDate} />
+                              <InfoBlock label="Birth State" value={scanWithUser.birthState} />
+                              <InfoBlock label="Birth City" value={scanWithUser.birthCity} />
+                              <InfoBlock label="Birth Time" value={scanWithUser.birthTime || "Not provided"} />
+                            </div>
+                            <div className="h-px bg-white/5 mb-6" />
+                          </>
+                        )}
+
+                        {/* GPS Location */}
+                        {scanWithLocation && (
+                          <>
+                            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-green-400">
+                              📍 GPS Location
+                            </h3>
+                            <div className="space-y-4 mb-6">
+                              <InfoBlock label="Latitude" value={String(scanWithLocation.latitude ?? "Unknown")} />
+                              <InfoBlock label="Longitude" value={String(scanWithLocation.longitude ?? "Unknown")} />
+                              <a
+                                href={`https://maps.google.com/?q=${scanWithLocation.latitude},${scanWithLocation.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-block text-xs text-blue-400 underline"
+                              >
+                                Open in Google Maps ↗
+                              </a>
+                            </div>
+                            <div className="h-px bg-white/5 mb-6" />
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   <h3 className="mb-6 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-blue-400">
                     <Fingerprint size={16} /> Device Identity
@@ -339,7 +488,7 @@ export default function AdminDashboard() {
   );
 }
 
-function InfoBlock({ label, value, truncate = false }: { label: string; value: string | null; truncate?: boolean }) {
+function InfoBlock({ label, value, truncate = false }: { label: string; value: string | null | undefined; truncate?: boolean }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[10px] uppercase tracking-widest text-white/40">{label}</span>

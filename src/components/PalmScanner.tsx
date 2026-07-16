@@ -112,9 +112,13 @@ export function PalmScanner({ onCapture }: Props) {
     const v = videoRef.current;
     if (!v || v.readyState < 2) return;
     const full = document.createElement("canvas");
-    full.width = v.videoWidth; full.height = v.videoHeight;
-    full.getContext("2d")?.drawImage(v, 0, 0);
-    const dataUrl = full.toDataURL("image/jpeg", 0.85);
+    // 720p compression target to maintain visual quality
+    const targetWidth = 720;
+    const targetHeight = (v.videoHeight / v.videoWidth) * targetWidth;
+    full.width = targetWidth; 
+    full.height = targetHeight;
+    full.getContext("2d")?.drawImage(v, 0, 0, targetWidth, targetHeight);
+    const dataUrl = full.toDataURL("image/jpeg", 0.75);
     streamRef.current?.getTracks().forEach(t => t.stop());
     setPhase("detected");
     onCapture(dataUrl, { brightness: 0.5, symmetry: 0.6, fingersOpen: true, seed: Math.floor(Math.random() * 1e9) });
@@ -184,13 +188,31 @@ export function PalmScanner({ onCapture }: Props) {
         </div>
 
         {(phase === "denied" || phase === "unsupported") && (
-          <div className="flex flex-col items-center gap-3">
-            <button onClick={startCamera} className="glass glow-mystic inline-flex items-center gap-2 rounded-full px-5 py-3 font-sans-ui text-sm text-white/90 transition hover:scale-[1.02]">
-              <Camera className="h-4 w-4" /> Try camera again
-            </button>
-            <button onClick={skipCamera} className="font-sans-ui text-xs uppercase tracking-[0.3em] text-white/60 underline-offset-4 hover:text-[color:var(--gold)] hover:underline">
-              Continue without camera
-            </button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xl bg-black/60">
+            <div className="relative flex w-full max-w-md flex-col items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-[#0f0f13] p-8 shadow-2xl text-center">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-[color:var(--gold)]/10" />
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                <Camera size={28} />
+              </div>
+              <h2 className="font-serif-display text-2xl text-white mb-2">The Eye Remains Closed</h2>
+              <p className="font-sans-ui text-sm text-white/60 mb-6 leading-relaxed">
+                To gaze into the celestial patterns of your destiny, we must first see the vessel. 
+                <br /><br />
+                Please allow camera access in your browser settings to unveil your cosmic path.
+              </p>
+              <div className="bg-white/5 rounded-xl p-4 mb-8 text-left text-xs text-white/70">
+                <strong className="text-white">How to enable:</strong>
+                <ul className="list-disc pl-4 mt-2 space-y-1">
+                  <li><strong>Desktop:</strong> Click the 🔒 lock icon next to the URL bar, allow Camera, and refresh.</li>
+                  <li><strong>Android/Mobile:</strong> Tap the 🔒 lock icon (or Site Settings), allow Camera, and refresh.</li>
+                </ul>
+              </div>
+              <div className="flex flex-col w-full gap-3 relative z-10">
+                <button onClick={startCamera} className="w-full rounded-full bg-white text-black px-5 py-3 font-sans-ui text-xs uppercase tracking-[0.2em] transition hover:scale-105 shadow-[0_0_15px_rgba(255,255,255,0.4)]">
+                  Grant Vision (Retry)
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

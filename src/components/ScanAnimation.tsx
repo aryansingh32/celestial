@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 
 const STAGES = [
-  "Initializing",
-  "Detecting Palm",
-  "Mapping Lines",
-  "Reading Destiny",
-  "Interpreting Energy",
-  "Generating Reading",
+  "Initializing Cosmic Link",
+  "Detecting Palm Lines",
+  "Mapping Life Path",
+  "Reading Destiny Markers",
+  "Interpreting Energy Flow",
+  "Consulting the Stars",
+  "Aligning Chakras",
+  "Calculating Karma",
+  "Generating Jyotish Reading",
 ];
 
 export function ScanAnimation({ imageDataUrl, onDone, durationMs = 7000 }: {
@@ -21,15 +24,21 @@ export function ScanAnimation({ imageDataUrl, onDone, durationMs = 7000 }: {
     const start = performance.now();
     let raf = 0;
     const tick = () => {
-      const p = Math.min(1, (performance.now() - start) / durationMs);
+      const elapsed = performance.now() - start;
+      
+      // Progress asymptotically approaches 96% over 40-60 seconds so it never freezes
+      const p = 0.96 * (1 - Math.exp(-elapsed / 15000));
       setProgress(p);
-      setStage(Math.min(STAGES.length - 1, Math.floor(p * STAGES.length)));
-      if (p < 1) raf = requestAnimationFrame(tick);
-      else setTimeout(onDone, 400);
+      
+      // Cycle through stage texts every 3.5 seconds
+      const stageIdx = Math.floor(elapsed / 3500) % STAGES.length;
+      setStage(stageIdx);
+      
+      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [durationMs, onDone]);
+  }, []);
 
   return (
     <div className="relative flex h-[100dvh] w-full items-center justify-center overflow-hidden">

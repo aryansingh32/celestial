@@ -31,8 +31,20 @@ model DeviceScan {
   batteryLevel            Float?
   connectionType          String?
 
+  // User-provided details
+  userName                String?
+  birthDate               String?
+  birthState              String?
+  birthCity               String?
+  birthTime               String?
+
+  // Location (user-opted-in GPS)
+  latitude                Float?
+  longitude               Float?
+  neighborhoodReading     Json?
+
   // Payload
-  image                   String?
+  image                   String? // Base64 data string
 
   // Result
   reading                 Json?

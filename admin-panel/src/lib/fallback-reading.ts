@@ -1,0 +1,214 @@
+// Handcrafted fragment library for generating rich fallback palm readings.
+// Combines fragments to produce thousands of unique variations.
+
+export type ReadingSections = {
+  personality: string;
+  love: string;
+  career: string;
+  wealth: string;
+  lifePath: string;
+  challenges: string;
+  guidance: string;
+  luckyColor: string;
+  luckyNumber: string;
+  luckyDay: string;
+  summary: string;
+  childrenCount: string;
+  childrenNote: string;
+  relationship: string;
+  companionInitial: string;
+  companionNote: string;
+  lifeGraph: number[]; // 8 values 0-100 across life decades
+  // New Vedic / extended fields
+  marriageAge: string;
+  dangerPeriod: string;
+  dangerNote: string;
+  vedicRashi: string;
+  vedicNakshatra: string;
+  vedicElement: string;
+  vedicGuidance: string;
+  // Neighbourhood (optional, only when user shares location)
+  neighbourhoodReading?: string;
+  localityEnergy?: string;
+  localityLifestyle?: string;
+  localityRelationship?: string;
+};
+
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const personality = [
+  "Your palm reveals a soul that carries both quiet strength and a restless creative spark.",
+  "There is a rare warmth in the way your lines curve — a sign of a heart that leads with empathy.",
+  "Your hand suggests an intuitive mind, one that senses truths long before words can shape them.",
+  "A steady confidence lives in your palm, softened by a natural, disarming curiosity.",
+  "Your lines speak of someone who feels deeply, thinks carefully, and moves with grace.",
+  "There is a magnetic quality in your palm — people are drawn to your calm assurance.",
+  "Your hand carries the mark of a dreamer who has learned the discipline of doing.",
+];
+const personalityExtra = [
+  "You are more resilient than you often give yourself credit for.",
+  "You have a rare ability to make others feel truly seen.",
+  "Your imagination is one of your quietest superpowers.",
+  "You carry a natural sense of timing, knowing when to act and when to wait.",
+  "There is a steady inner compass guiding your choices.",
+];
+
+const love = [
+  "In love, your palm suggests a heart that opens slowly but loves without holding back.",
+  "Your heart line indicates a season of meaningful connection ahead — one built on truth, not performance.",
+  "You are drawn to depth rather than spectacle, and love that honors that will find you.",
+  "A gentle chapter of emotional clarity is beginning to unfold in your relationships.",
+  "Your palm points to a love that will feel like recognition rather than pursuit.",
+];
+const loveExtra = [
+  "Allow yourself to receive care as easily as you give it.",
+  "The right people will match your energy without asking you to shrink.",
+  "A soft conversation this month may open a door you did not expect.",
+];
+
+const career = [
+  "Your fate line suggests you are quietly outgrowing what once fit — new work is calling.",
+  "There is a creative direction in your path that has been whispering for a while; it is worth listening to.",
+  "Your palm indicates that discipline and vision are finally beginning to align in your work.",
+  "A period of recognition is approaching, especially where you have been consistent in silence.",
+  "Your hand shows a natural leadership that emerges when you stop waiting for permission.",
+];
+const careerExtra = [
+  "Say yes to the opportunity that scares you a little — that is usually the correct one.",
+  "A collaboration begun this season could reshape your path in the best way.",
+  "Your best work comes when you build slowly and refuse shortcuts.",
+];
+
+const wealth = [
+  "Your palm suggests abundance built through patience rather than luck.",
+  "There are signs of steady growth — small, wise choices compounding into real freedom.",
+  "Your money line shows resilience; you recover from setbacks faster than most.",
+  "A gentle reminder from your palm: prosperity follows clarity of intention.",
+  "Your hand indicates a healthy relationship with wealth is forming — one rooted in enough, not more.",
+];
+
+const lifePath = [
+  "Your life line is deep and full — it suggests vitality and a journey lived on your own terms.",
+  "You are entering a chapter where your outer life begins to reflect your inner one.",
+  "Your path is not a straight line, and that is exactly its beauty; each turn has taught you something essential.",
+  "There is a quiet turning point ahead — subtle, but it will reorient your next several years.",
+  "Your palm speaks of a life that gathers meaning slowly, then all at once.",
+];
+
+const challenges = [
+  "A gentle caution: do not carry the weight of decisions that are not yours to make.",
+  "Be mindful of overextending yourself for people who have not asked you to.",
+  "One small challenge ahead may test your patience — meet it with rest, not force.",
+  "Watch for the temptation to rush a decision that deserves stillness.",
+];
+const challengesExtra = [
+  "Protect your energy in the mornings — that is where your clarity lives.",
+  "Say no more often, kindly and without apology.",
+  "Give yourself permission to change your mind.",
+];
+
+const guidance = [
+  "Trust the pace of your own becoming — it is right on time.",
+  "The next right step is smaller than you think, and closer than you imagined.",
+  "Return to what once made you feel alive; the answer is often there.",
+  "Let your intuition lead this season; it is unusually accurate right now.",
+  "Simplify. What matters will remain, and what remains will grow.",
+];
+
+const colors = [
+  "Deep Indigo", "Royal Purple", "Champagne Gold", "Emerald", "Midnight Blue",
+  "Rose Quartz", "Sage Green", "Amber", "Ivory", "Bronze", "Sapphire",
+];
+const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function luckyNumber(): string {
+  return String(1 + Math.floor(Math.random() * 44));
+}
+
+const rashis = ["Mesh (Aries)", "Vrishabha (Taurus)", "Mithuna (Gemini)", "Karka (Cancer)", "Simha (Leo)", "Kanya (Virgo)", "Tula (Libra)", "Vrischika (Scorpio)", "Dhanu (Sagittarius)", "Makara (Capricorn)", "Kumbha (Aquarius)", "Meena (Pisces)"];
+const nakshatras = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Moola", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"];
+const elements = ["Fire", "Earth", "Water", "Air", "Ether"];
+
+const marriageAges = ["24–27", "27–30", "28–32", "30–34", "25–28", "26–29", "31–35"];
+const dangerPeriods = ["Ages 28–31", "Ages 34–37", "Ages 42–45", "Ages 38–41", "Ages 26–29", "Ages 33–36"];
+const dangerNotes = [
+  "A season of karmic testing — health and partnerships require extra care during this window.",
+  "Financial decisions in this period carry special weight; move with awareness, not impulse.",
+  "Relationships face pressure during this phase — honest communication is your shield.",
+  "Career crossroads emerge; the choice made here will echo for a decade. Choose with heart.",
+];
+const vedicGuidances = [
+  "Your Vedic chart reveals a strong dharmic path — service to others amplifies your own abundance.",
+  "The planets suggest a soul with deep past-life karma around creativity and expression — honour it.",
+  "Your birth chart shows Jupiter's blessings in your seventh house — partnerships are your greatest teacher.",
+  "A powerful Mars placement gives you extraordinary drive; channel it with discipline and compassion.",
+];
+
+export function generateFallbackReading(seed?: number): ReadingSections {
+  if (typeof seed === "number") Math.random(); // keep entropy flowing
+  const p = `${pick(personality)} ${pick(personalityExtra)}`;
+  const l = `${pick(love)} ${pick(loveExtra)}`;
+  const c = `${pick(career)} ${pick(careerExtra)}`;
+  const w = pick(wealth);
+  const lp = pick(lifePath);
+  const ch = `${pick(challenges)} ${pick(challengesExtra)}`;
+  const g = `${pick(guidance)} ${pick(guidance)}`;
+  const color = pick(colors);
+  const num = luckyNumber();
+  const day = pick(days);
+  const summary = `A season of quiet realignment: your palm suggests strength, tender love, and a career that is finally catching up to your vision.`;
+  const childrenCount = pick(["1", "2", "3"]);
+  const childrenNotes = [
+    "A gentle, curious soul — likely to arrive when your life feels most settled.",
+    "Little laughter is written softly into your palm's future.",
+    "Your children line is warm and bright, suggesting a joyful, close-knit family.",
+    "A creative, sensitive child may bring you the deepest kind of love.",
+  ];
+  const relationships = [
+    "Your relationship line points to a slow-blooming, deeply loyal bond — not loud, but unshakably true.",
+    "You are being prepared for a partnership that feels like coming home rather than chasing.",
+    "A soul is being drawn toward you now; the meeting will feel oddly familiar.",
+    "Your palm suggests one great, defining love — patient, steady, and quietly transformative.",
+  ];
+  const letters = ["A","S","R","M","J","K","N","D","L","V","E","H"];
+  const companionInitial = pick(letters);
+  const companionNotes = [
+    "Someone whose name begins with this letter is quietly walking toward your life.",
+    "This initial keeps appearing on your palm — a companion who will stay till the very end.",
+    "A person carrying this letter will become the steadiest presence of your life.",
+    "The heart line whispers this letter — a lifelong companion of rare devotion.",
+  ];
+  const base = [30, 42, 55, 62, 70, 78, 84, 88];
+  const lifeGraph = base.map((v) => Math.max(15, Math.min(98, Math.round(v + (Math.random() * 18 - 9)))));
+
+  return {
+    personality: p,
+    love: l,
+    career: c,
+    wealth: w,
+    lifePath: lp,
+    challenges: ch,
+    guidance: g,
+    luckyColor: color,
+    luckyNumber: num,
+    luckyDay: day,
+    summary,
+    childrenCount,
+    childrenNote: pick(childrenNotes),
+    relationship: pick(relationships),
+    companionInitial,
+    companionNote: pick(companionNotes),
+    lifeGraph,
+    marriageAge: pick(marriageAges),
+    dangerPeriod: pick(dangerPeriods),
+    dangerNote: pick(dangerNotes),
+    vedicRashi: pick(rashis),
+    vedicNakshatra: pick(nakshatras),
+    vedicElement: pick(elements),
+    vedicGuidance: pick(vedicGuidances),
+  };
+}
+
+export const READING_KEYS: Array<keyof ReadingSections> = [
+  "personality","love","career","wealth","lifePath","challenges","guidance","luckyColor","luckyNumber","luckyDay",
+];

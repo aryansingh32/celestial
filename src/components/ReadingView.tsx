@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import type { ReadingSections } from "@/lib/fallback-reading";
-import type { NeighbourhoodReading } from "@/lib/reading.functions";
 import type { UserDetails } from "@/components/UserDetailsModal";
 import {
   Sparkles, Heart, Briefcase, Coins, Moon, ShieldAlert, Leaf,
@@ -8,6 +7,15 @@ import {
   Baby, Users, Infinity as InfinityIcon, AlertTriangle, Gem,
   Star, Flame, MapPin, Home, Wind, Zap,
 } from "lucide-react";
+
+export type NeighbourhoodReading = {
+  neighbourhoodReading: string;
+  localityEnergy: string;
+  localityLifestyle: string;
+  localityRelationship: string;
+};
+
+
 
 
 type CardDef = { key: keyof ReadingSections; title: string; icon: React.ComponentType<{ className?: string }>; accent: string };

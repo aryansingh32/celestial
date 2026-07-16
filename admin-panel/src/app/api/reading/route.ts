@@ -1,6 +1,9 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import { generateFallbackReading, type ReadingSections } from "./fallback-reading";
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { generateFallbackReading, type ReadingSections } from '@/lib/fallback-reading';
+import { corsHeaders, handleOptions } from '@/lib/cors';
+
+export const OPTIONS = handleOptions;
 
 const PalmHintsSchema = z.object({
   handedness: z.enum(["left", "right", "unknown"]).default("unknown"),
@@ -24,15 +27,7 @@ const InputSchema = z.object({
   userDetails: UserDetailsSchema,
 });
 
-// All free models to try in order
-const MODELS = [
-  "google/gemini-2.0-flash-exp:free",
-  "google/gemini-2.5-flash:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "deepseek/deepseek-chat-v3.1:free",
-  "mistralai/mistral-7b-instruct:free",
-];
-
+// Models are dynamically built in the POST function
 const SYSTEM_PROMPT = `You are Jyotishi — an ancient Vedic astrologer and palm reader, master of both traditional palmistry and Jyotish astrology. You blend the wisdom of the stars with the secrets written on the palm.
 
 Rules:
@@ -119,7 +114,10 @@ async function tryModel(apiKey: string, model: string, hints: z.infer<typeof Pal
   }
   const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const raw = data?.choices?.[0]?.message?.content?.trim();
-  if (!raw) return null;
+  if (!raw) {
+    console.warn(`[AI] Model ${model} returned empty content:`, JSON.stringify(data).substring(0, 200));
+    return null;
+  }
   const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   try {
     const parsed = JSON.parse(cleaned) as Partial<ReadingSections>;
@@ -152,119 +150,57 @@ async function tryModel(apiKey: string, model: string, hints: z.infer<typeof Pal
       vedicElement: (parsed.vedicElement as string) || fb.vedicElement,
       vedicGuidance: (parsed.vedicGuidance as string) || fb.vedicGuidance,
     } as ReadingSections;
-  } catch {
+  } catch (parseError) {
+    console.error(`[AI] Model ${model} failed to parse JSON. Raw output:`, raw.substring(0, 150) + "...");
     return null;
   }
 }
 
-export const generateReading = createServerFn({ method: "POST" })
-  .validator((raw: unknown) => InputSchema.parse(raw))
-  .handler(async ({ data }): Promise<{ reading: ReadingSections; source: "ai" | "fallback" }> => {
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const data = InputSchema.parse(body);
+
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       console.warn("[AI] No OPENROUTER_API_KEY — using fallback");
-      return { reading: generateFallbackReading(data.hints.seed), source: "fallback" };
+      return NextResponse.json({ reading: generateFallbackReading(data.hints.seed), source: "fallback" }, { headers: corsHeaders });
     }
 
-    for (const model of MODELS) {
+    // The previous models were either timing out (Omni) or only returning safety scores (Content Safety).
+    // These models from your list are lightning fast and actually generate valid JSON text responses.
+    const reliableFastModels = [
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "meta-llama/llama-3.2-3b-instruct:free"
+    ];
+    
+    // We try the 70B model first for higher quality, and 3B for ultra-fast fallback
+    const attempts = reliableFastModels;
+
+    for (const model of attempts) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20000);
+        // Increased timeout to 90 seconds for heavy reasoning models
+        const timer = setTimeout(() => controller.abort(), 90000);
         console.log(`[AI] Trying model: ${model}`);
         const result = await tryModel(apiKey, model, data.hints, data.userDetails, controller.signal);
         clearTimeout(timer);
         if (result) {
           console.log(`[AI] Success with model: ${model}`);
-          return { reading: result, source: "ai" };
+          return NextResponse.json({ reading: result, source: "ai" }, { headers: corsHeaders });
         }
       } catch (err) {
-        console.error(`[AI] Model ${model} threw:`, err);
-        // try next model
+        console.error(`[AI] Model ${model} threw:`, err instanceof Error ? err.message : err);
       }
+      
+      // Add a 1.5 second delay before trying the fallback model to prevent 429 Too Many Requests
+      await new Promise(resolve => setTimeout(resolve, 1500));
     }
     console.warn("[AI] All models failed — using fallback");
-    return { reading: generateFallbackReading(data.hints.seed), source: "fallback" };
-  });
+    return NextResponse.json({ reading: generateFallbackReading(data.hints.seed), source: "fallback" }, { headers: corsHeaders });
 
-// ─── Neighbourhood reading server fn ───────────────────────────────────────
-
-const NeighbourhoodInputSchema = z.object({
-  latitude: z.number(),
-  longitude: z.number(),
-  userName: z.string().optional(),
-  birthState: z.string().optional(),
-  birthCity: z.string().optional(),
-  readingSummary: z.string().optional(),
-});
-
-export type NeighbourhoodReading = {
-  neighbourhoodReading: string;
-  localityEnergy: string;
-  localityLifestyle: string;
-  localityRelationship: string;
-};
-
-export const generateNeighbourhoodReading = createServerFn({ method: "POST" })
-  .validator((raw: unknown) => NeighbourhoodInputSchema.parse(raw))
-  .handler(async ({ data }): Promise<{ reading: NeighbourhoodReading; source: "ai" | "fallback" }> => {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-
-    const fallback: NeighbourhoodReading = {
-      neighbourhoodReading: "The energy around your home radiates warmth and quiet protection. Your locality carries an ancient calm that supports your growth.",
-      localityEnergy: "Your neighbourhood vibrates at a frequency of gentle abundance — the kind that asks for nothing but gives everything in return.",
-      localityLifestyle: "Those who live near you tend to be creative, community-minded souls. Your lifestyle aligns beautifully with the rhythm of this place.",
-      localityRelationship: "A neighbour or nearby soul carries a connection to your destiny. The one who lives closest to the east holds an unexpected gift for your journey.",
-    };
-
-    if (!apiKey) return { reading: fallback, source: "fallback" };
-
-    const prompt = `Based on these details, generate a mystical, warm, and poetic neighbourhood reading:
-
-User: ${data.userName || "The seeker"}
-GPS Location: Latitude ${data.latitude.toFixed(4)}, Longitude ${data.longitude.toFixed(4)}
-Birth origin: ${[data.birthCity, data.birthState].filter(Boolean).join(", ") || "India"}
-Palm reading summary: ${data.readingSummary || "A soul on a beautiful journey"}
-
-Return JSON with exactly these keys:
-{
-  "neighbourhoodReading": "2-3 sentences about the cosmic energy of their physical location and what it means for their life",
-  "localityEnergy": "2 sentences about the energy vibration of their neighbourhood and how it affects them",
-  "localityLifestyle": "2 sentences about the lifestyle and nature of people in their locality and how it resonates with the user",
-  "localityRelationship": "2-3 warm, poetic sentences about relationships with neighbours and people nearby — any hidden connections or soul contracts"
-}`;
-
-    for (const model of MODELS.slice(0, 3)) {
-      try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 15000);
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            "X-Title": "Celestial Touch",
-          },
-          body: JSON.stringify({
-            model,
-            temperature: 0.9,
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: "You are a mystical astrologer. Respond only with valid JSON." },
-              { role: "user", content: prompt },
-            ],
-          }),
-        });
-        if (!res.ok) continue;
-        const d = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-        const raw = d?.choices?.[0]?.message?.content?.trim();
-        if (!raw) continue;
-        const parsed = JSON.parse(raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim()) as NeighbourhoodReading;
-        if (parsed.neighbourhoodReading && parsed.localityEnergy) {
-          return { reading: parsed, source: "ai" };
-        }
-      } catch { /* try next */ }
-    }
-
-    return { reading: fallback, source: "fallback" };
-  });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Invalid input" }, { status: 400, headers: corsHeaders });
+  }
+}
