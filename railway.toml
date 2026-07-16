@@ -1,10 +1,10 @@
 [build]
 builder = "nixpacks"
 watchPatterns = ["admin-panel/**", "!admin-panel/node_modules/**"]
-buildCommand = "cd admin-panel && npm install && npx prisma generate && npx prisma db push --accept-data-loss && npm run build"
+buildCommand = "cd admin-panel && npm install && npx prisma generate && npm run build"
 
 [deploy]
-startCommand = "cd admin-panel && npm run start"
+startCommand = "cd admin-panel && npx prisma db push --accept-data-loss && npm run start"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
