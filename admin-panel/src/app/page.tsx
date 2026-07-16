@@ -198,35 +198,6 @@ export default function AdminDashboard() {
       </header>
 
       <main className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {devices.map((device, i) => (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            key={device.id}
-            onClick={() => setSelectedDevice(device)}
-            className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-6 backdrop-blur-sm transition-all hover:border-blue-500/50 hover:bg-blue-500/5"
-          >
-            {/* Glow effect */}
-            <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-blue-500/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-            
-            <div className="relative z-10">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-                    {device.userAgent?.includes("Mobile") ? <Smartphone size={20} /> : <Monitor size={20} />}
-                  </div>
-                  <div>
-                    <h3 className="font-mono text-sm text-white">{device.publicIp || "Unknown IP"}</h3>
-                    <p className="text-xs opacity-50 flex items-center gap-1 mt-1">
-                      <Globe size={10} /> {device.timezone}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80">
-                  <ImageIcon size={12} className="opacity-60" />
-                  {device.scans.length}
-                </div>
         {devices.map((device, i) => {
           const isOnline = device.lastSeen ? (new Date().getTime() - new Date(device.lastSeen).getTime()) < 15000 : false;
           return (
