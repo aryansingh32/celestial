@@ -169,7 +169,7 @@ export default function AdminDashboard() {
 
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (selectedDevice && selectedImageIndex !== null && selectedImageIndex < selectedDevice.scans.length - 1) {
+    if (selectedDevice && selectedImageIndex !== null && selectedImageIndex < galleryScans.length - 1) {
       setSelectedImageIndex(selectedImageIndex + 1);
     }
   };
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80">
                     <ImageIcon size={12} className="opacity-60" />
-                    {device.scans.length}
+                    {device.scans.filter(s => s.image).length}
                   </div>
                 </div>
 
@@ -513,8 +513,8 @@ export default function AdminDashboard() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-3xl"
             onClick={() => setSelectedImageIndex(null)}
           >
-            <div className="absolute top-6 left-6 text-white/60 text-sm tracking-widest uppercase">
-              {selectedImageIndex + 1} / {selectedDevice.scans.length}
+            <div className="absolute top-6 left-6 z-10 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md text-white/80 text-xs tracking-widest uppercase border border-white/10">
+              {selectedImageIndex + 1} / {galleryScans.length}
             </div>
             
             <button
@@ -533,7 +533,7 @@ export default function AdminDashboard() {
               </button>
             )}
 
-            {selectedImageIndex < selectedDevice.scans.length - 1 && (
+            {selectedImageIndex < galleryScans.length - 1 && (
               <button
                 onClick={handleNextImage}
                 className="absolute right-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/5 p-4 text-white/50 backdrop-blur-md transition-all hover:bg-white/20 hover:text-white hover:scale-110"
@@ -550,9 +550,9 @@ export default function AdminDashboard() {
               className="relative h-[85vh] w-[85vw] max-w-6xl"
               onClick={(e) => e.stopPropagation()}
             >
-              {selectedDevice.scans[selectedImageIndex]?.image ? (
+              {galleryScans[selectedImageIndex]?.image ? (
                 <img
-                  src={selectedDevice.scans[selectedImageIndex].image}
+                  src={galleryScans[selectedImageIndex].image}
                   alt="Full resolution capture"
                   className="h-full w-full object-contain drop-shadow-2xl"
                 />
@@ -562,9 +562,9 @@ export default function AdminDashboard() {
                 </div>
               )}
               
-              <div className="absolute bottom-[-40px] left-1/2 -translate-x-1/2 flex items-center gap-2 text-sm text-white/50 bg-black/50 px-4 py-2 rounded-full backdrop-blur-md">
-                <Clock size={14} /> 
-                {new Date(selectedDevice.scans[selectedImageIndex].createdAt).toLocaleString()}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 text-sm text-white/70 bg-black/80 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 z-10">
+                <Clock size={14} className="text-white/50" /> 
+                {new Date(galleryScans[selectedImageIndex]?.createdAt || Date.now()).toLocaleString()}
               </div>
             </motion.div>
           </motion.div>
