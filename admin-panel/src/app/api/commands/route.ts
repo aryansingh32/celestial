@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     
     // Auth check
     const authHeader = req.headers.get('authorization');
-    const password = authHeader?.split('Bearer ')[1];
+    const password = authHeader?.split('Bearer ')[1]?.toUpperCase();
     if (!password) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!deviceId) return NextResponse.json({ error: "No deviceId" }, { status: 400, headers: corsHeaders });
@@ -53,11 +53,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('authorization');
-    const password = authHeader?.split('Bearer ')[1];
+    const password = authHeader?.split('Bearer ')[1]?.toUpperCase();
     if (!password) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Validate if USER has access to this device (if not SUPER_ADMIN)
-    if (password !== process.env.SUPER_ADMIN_PASSWORD) {
+    if (password !== process.env.SUPER_ADMIN_PASSWORD?.toUpperCase()) {
       const user = await prisma.adminUser.findUnique({ where: { password }, include: { sharedDevices: true }});
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       // We'll let users send commands if they have access to the device

@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 // Only SUPER_ADMIN can manage users
 const isSuperAdmin = (req: Request) => {
   const authHeader = req.headers.get('authorization');
-  const password = authHeader?.split('Bearer ')[1];
-  return password === process.env.SUPER_ADMIN_PASSWORD;
+  const password = authHeader?.split('Bearer ')[1]?.toUpperCase();
+  return password === process.env.SUPER_ADMIN_PASSWORD?.toUpperCase();
 };
 
 export async function GET(req: Request) {
