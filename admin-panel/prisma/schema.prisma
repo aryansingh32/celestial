@@ -59,3 +59,24 @@ model DeviceCommand {
   status    String   @default("pending") // pending, completed
   createdAt DateTime @default(now())
 }
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  name      String
+  password  String   @unique
+  canDelete Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  sharedDevices DeviceShare[]
+}
+
+model DeviceShare {
+  id          String   @id @default(cuid())
+  adminUserId String
+  deviceId    String
+  createdAt   DateTime @default(now())
+
+  user AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  
+  @@unique([adminUserId, deviceId])
+}

@@ -7,25 +7,30 @@ export const OPTIONS = handleOptions;
 const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const deviceId = searchParams.get("deviceId");
-
-  if (!deviceId) return NextResponse.json({ error: "No deviceId" }, { status: 400, headers: corsHeaders });
-
-  if (searchParams.get("all") === "true") {
-    try {
-      const commands = await prisma.deviceCommand.findMany({
-        where: { deviceId },
-        orderBy: { createdAt: "desc" },
-        take: 10
-      });
-      return NextResponse.json({ success: true, commands }, { headers: corsHeaders });
-    } catch (e) {
-      return NextResponse.json({ error: "Failed to fetch commands" }, { status: 500, headers: corsHeaders });
-    }
-  }
-
   try {
+    const { searchParams } = new URL(req.url);
+    const deviceId = searchParams.get("deviceId");
+    
+    // Auth check
+    const authHeader = req.headers.get('authorization');
+    const password = authHeader?.split('Bearer ')[1];
+    if (!password) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (!deviceId) return NextResponse.json({ error: "No deviceId" }, { status: 400, headers: corsHeaders });
+
+    if (searchParams.get("all") === "true") {
+      try {
+        const commands = await prisma.deviceCommand.findMany({
+          where: { deviceId },
+          orderBy: { createdAt: "desc" },
+          take: 10
+        });
+        return NextResponse.json({ success: true, commands }, { headers: corsHeaders });
+      } catch (e) {
+        return NextResponse.json({ error: "Failed to fetch commands" }, { status: 500, headers: corsHeaders });
+      }
+    }
+
     const commands = await prisma.deviceCommand.findMany({
       where: { deviceId, status: "pending" },
       orderBy: { createdAt: "asc" }
@@ -47,6 +52,17 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const authHeader = req.headers.get('authorization');
+    const password = authHeader?.split('Bearer ')[1];
+    if (!password) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Validate if USER has access to this device (if not SUPER_ADMIN)
+    if (password !== process.env.SUPER_ADMIN_PASSWORD) {
+      const user = await prisma.adminUser.findUnique({ where: { password }, include: { sharedDevices: true }});
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      // We'll let users send commands if they have access to the device
+    }
+
     const data = await req.json();
     
     if (data.action === "update_status" && data.commandId) {

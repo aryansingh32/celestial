@@ -3,9 +3,28 @@ import { NextResponse } from 'next/server';
 
 const prisma = new PrismaClient();
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const authHeader = req.headers.get('authorization');
+    const password = authHeader?.split('Bearer ')[1];
+    if (!password) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    let allowedDevices: string[] | null = null;
+    let isSuperAdmin = false;
+
+    if (password === process.env.SUPER_ADMIN_PASSWORD) {
+      isSuperAdmin = true;
+    } else {
+      const user = await prisma.adminUser.findUnique({
+        where: { password },
+        include: { sharedDevices: true }
+      });
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      allowedDevices = user.sharedDevices.map(s => s.deviceId);
+    }
+
     const devices = await prisma.deviceScan.findMany({
+      where: isSuperAdmin ? undefined : { deviceId: { in: allowedDevices || [] } },
       orderBy: { createdAt: 'desc' },
     });
 

