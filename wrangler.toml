@@ -1,5 +1,4 @@
 name = "celestial-touch"
-pages_build_output_dir = ".output/public"
 compatibility_date = "2024-01-01"
 
 # The frontend runs on TanStack Start with Nitro configured for Cloudflare Pages.
