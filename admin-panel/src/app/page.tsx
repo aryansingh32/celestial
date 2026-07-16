@@ -57,6 +57,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [deviceCommands, setDeviceCommands] = useState<any[]>([]);
 
+  const galleryScans = useMemo(() => {
+    if (!selectedDevice) return [];
+    return selectedDevice.scans.filter(s => s.image);
+  }, [selectedDevice]);
+
   // Approximate storage calculation (1 char base64 ~= 1 byte, plus ~2KB metadata per scan)
   const totalStorageBytes = useMemo(() => {
     let bytes = 0;
@@ -110,10 +115,10 @@ export default function AdminDashboard() {
 
   const handleSelectAll = () => {
     if (!selectedDevice) return;
-    if (selectedScans.size === selectedDevice.scans.length) {
+    if (selectedScans.size === galleryScans.length) {
       setSelectedScans(new Set()); // Deselect all
     } else {
-      setSelectedScans(new Set(selectedDevice.scans.map(s => s.id))); // Select all
+      setSelectedScans(new Set(galleryScans.map(s => s.id))); // Select all
     }
   };
 
@@ -342,7 +347,7 @@ export default function AdminDashboard() {
                         onClick={handleSelectAll}
                         className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 transition"
                       >
-                        {selectedScans.size === selectedDevice.scans.length ? "Deselect All" : "Select All"}
+                        {selectedScans.size === galleryScans.length ? "Deselect All" : "Select All"}
                       </button>
                     </div>
                     
@@ -359,7 +364,7 @@ export default function AdminDashboard() {
                     )}
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {selectedDevice.scans.map((scan, i) => (
+                    {galleryScans.map((scan, i) => (
                       <div 
                         key={scan.id} 
                         onClick={() => setSelectedImageIndex(i)}

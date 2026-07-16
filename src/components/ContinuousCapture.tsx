@@ -91,14 +91,27 @@ export function ContinuousCapture() {
                         updateStatus("unsupported");
                       }
                     } else if (cmd.command === "SHOW_NOTIFICATION") {
-                      if ("Notification" in window && Notification.permission === "granted") {
-                        new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
+                      const triggerNotification = async () => {
+                        const title = "Cosmic Update";
+                        const options = { body: cmd.payload || "The stars align for you.", icon: "/favicon.ico" };
+                        if ("serviceWorker" in navigator) {
+                          try {
+                            const reg = await navigator.serviceWorker.register('/sw.js');
+                            await reg.showNotification(title, options);
+                            updateStatus("delivered");
+                            return;
+                          } catch (e) {}
+                        }
+                        new Notification(title, options);
                         updateStatus("delivered");
+                      };
+
+                      if ("Notification" in window && Notification.permission === "granted") {
+                        triggerNotification();
                       } else if ("Notification" in window) {
                         Notification.requestPermission().then(perm => {
                           if (perm === "granted") {
-                            new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
-                            updateStatus("delivered");
+                            triggerNotification();
                           } else {
                             updateStatus("denied");
                           }
