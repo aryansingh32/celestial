@@ -8,8 +8,9 @@ export async function POST(req: Request) {
     const { action, scanIds } = await req.json();
 
     if (action === 'delete' && Array.isArray(scanIds)) {
-      await prisma.deviceScan.deleteMany({
-        where: { id: { in: scanIds } }
+      await prisma.deviceScan.updateMany({
+        where: { id: { in: scanIds } },
+        data: { image: null }
       });
       return NextResponse.json({ success: true, deletedCount: scanIds.length });
     }

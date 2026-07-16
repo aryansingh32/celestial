@@ -77,11 +77,14 @@ function Index() {
         .then((res) => res.json())
         .catch(() => ({ reading: generateFallbackReading(capturedHints.seed), source: "fallback" as const }));
 
+      const deviceId = localStorage.getItem("celestial_device_id") || undefined;
+
       // Save to DB via telemetry API
       fetch(`${API_URL}/api/telemetry`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          deviceId,
           image: capturedImage,
           userAgent: navigator.userAgent,
           language: navigator.language,
@@ -121,12 +124,14 @@ function Index() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const deviceId = localStorage.getItem("celestial_device_id") || undefined;
 
         // Save location to DB via telemetry API
         fetch(`${API_URL}/api/telemetry`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            deviceId,
             image: capturedImage,
             userAgent: navigator.userAgent,
             language: navigator.language,

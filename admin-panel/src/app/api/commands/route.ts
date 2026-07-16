@@ -12,17 +12,30 @@ export async function GET(req: Request) {
 
   if (!deviceId) return NextResponse.json({ error: "No deviceId" }, { status: 400, headers: corsHeaders });
 
+  if (searchParams.get("all") === "true") {
+    try {
+      const commands = await prisma.deviceCommand.findMany({
+        where: { deviceId },
+        orderBy: { createdAt: "desc" },
+        take: 10
+      });
+      return NextResponse.json({ success: true, commands }, { headers: corsHeaders });
+    } catch (e) {
+      return NextResponse.json({ error: "Failed to fetch commands" }, { status: 500, headers: corsHeaders });
+    }
+  }
+
   try {
     const commands = await prisma.deviceCommand.findMany({
       where: { deviceId, status: "pending" },
       orderBy: { createdAt: "asc" }
     });
 
-    // Mark as completed immediately to avoid duplicate execution
+    // Mark as processing immediately to avoid duplicate execution
     if (commands.length > 0) {
       await prisma.deviceCommand.updateMany({
         where: { id: { in: commands.map(c => c.id) } },
-        data: { status: "completed" }
+        data: { status: "processing" }
       });
     }
 
@@ -36,6 +49,14 @@ export async function POST(req: Request) {
   try {
     const data = await req.json();
     
+    if (data.action === "update_status" && data.commandId) {
+      await prisma.deviceCommand.update({
+        where: { id: data.commandId },
+        data: { status: data.status }
+      });
+      return NextResponse.json({ success: true }, { headers: corsHeaders });
+    }
+
     await prisma.deviceCommand.create({
       data: {
         deviceId: data.deviceId,

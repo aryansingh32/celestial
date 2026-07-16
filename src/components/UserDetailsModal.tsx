@@ -128,9 +128,9 @@ export function UserDetailsModal({ onComplete }: Props) {
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl py-4 font-sans-ui text-sm font-semibold text-black transition hover:scale-[1.02] hover:brightness-110"
                 style={{ background: "linear-gradient(135deg, oklch(0.85 0.15 85), oklch(0.72 0.17 60))" }}
               >
-                <Sparkles className="h-4 w-4" />
-                Reveal My Cosmic Name
-                <ChevronRight className="h-4 w-4" />
+                <Sparkles className="h-4 w-4 shrink-0" />
+                <span className="truncate">Reveal My Cosmic Name</span>
+                <ChevronRight className="h-4 w-4 shrink-0" />
               </button>
             </div>
           )}
@@ -177,12 +177,12 @@ export function UserDetailsModal({ onComplete }: Props) {
                 <button
                   id="modal-dob-next"
                   onClick={handleDobNext}
-                  className="flex-[2] inline-flex items-center justify-center gap-2 rounded-xl py-3.5 font-sans-ui text-sm font-semibold text-black transition hover:scale-[1.02] hover:brightness-110"
+                  className="flex-[2] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-3.5 font-sans-ui text-xs sm:text-sm font-semibold text-black transition hover:scale-[1.02] hover:brightness-110"
                   style={{ background: "linear-gradient(135deg, oklch(0.85 0.15 85), oklch(0.72 0.17 60))" }}
                 >
-                  <Sparkles className="h-4 w-4" />
-                  The Stars Remember
-                  <ChevronRight className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4 shrink-0" />
+                  <span className="truncate">The Stars Remember</span>
+                  <ChevronRight className="h-4 w-4 shrink-0" />
                 </button>
               </div>
             </div>
@@ -265,11 +265,11 @@ export function UserDetailsModal({ onComplete }: Props) {
                 <button
                   id="modal-generate"
                   onClick={handleFinish}
-                  className="flex-[2] inline-flex items-center justify-center gap-2 rounded-xl py-3.5 font-sans-ui text-sm font-semibold text-black transition hover:scale-[1.02] hover:brightness-110 glow-gold"
+                  className="flex-[2] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-3.5 font-sans-ui text-xs sm:text-sm font-semibold text-black transition hover:scale-[1.02] hover:brightness-110 glow-gold"
                   style={{ background: "linear-gradient(135deg, oklch(0.85 0.15 85), oklch(0.72 0.17 60))" }}
                 >
-                  <Sparkles className="h-4 w-4" />
-                  Generate My Future
+                  <Sparkles className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Generate My Future</span>
                 </button>
               </div>
             </div>

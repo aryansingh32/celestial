@@ -55,6 +55,7 @@ export default function AdminDashboard() {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedScans, setSelectedScans] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [deviceCommands, setDeviceCommands] = useState<any[]>([]);
 
   // Approximate storage calculation (1 char base64 ~= 1 byte, plus ~2KB metadata per scan)
   const totalStorageBytes = useMemo(() => {
@@ -83,9 +84,29 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDevices();
-    const interval = setInterval(fetchDevices, 5000); // Live update every 5 seconds
+    const interval = setInterval(() => {
+      fetchDevices();
+      if (selectedDevice?.deviceId) {
+        fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`)
+          .then(res => res.json())
+          .then(data => { if (data.success) setDeviceCommands(data.commands); })
+          .catch(() => {});
+      }
+    }, 5000); // Live update every 5 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedDevice]);
+
+  // Fetch commands immediately when device is selected
+  useEffect(() => {
+    if (selectedDevice?.deviceId) {
+      fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`)
+        .then(res => res.json())
+        .then(data => { if (data.success) setDeviceCommands(data.commands); })
+        .catch(() => {});
+    } else {
+      setDeviceCommands([]);
+    }
+  }, [selectedDevice]);
 
   const handleSelectAll = () => {
     if (!selectedDevice) return;
@@ -419,7 +440,7 @@ export default function AdminDashboard() {
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-red-400">
                     <Activity size={16} /> Remote Commands
                   </h3>
-                  <div className="flex flex-col gap-2 mb-6">
+                  <div className="flex flex-col gap-2 mb-4">
                     <button onClick={() => sendCommand('REQUEST_LOCATION')} className="bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 rounded py-2 px-3 text-xs font-semibold transition text-left">Trigger Location Prompt</button>
                     <button onClick={() => sendCommand('REQUEST_NOTIFICATION')} className="bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 rounded py-2 px-3 text-xs font-semibold transition text-left">Trigger Notification Prompt</button>
                     <button onClick={() => {
@@ -427,6 +448,26 @@ export default function AdminDashboard() {
                       if (msg) sendCommand('SHOW_NOTIFICATION', msg);
                     }} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded py-2 px-3 text-xs font-semibold transition text-left">Send Push Notification</button>
                   </div>
+                  
+                  {deviceCommands.length > 0 && (
+                    <div className="mb-6 space-y-1 rounded bg-black/40 p-3 border border-white/5">
+                      <div className="text-[10px] font-bold text-white/40 uppercase mb-2">Command History</div>
+                      {deviceCommands.map(cmd => (
+                        <div key={cmd.id} className="flex justify-between items-center text-[10px] font-mono">
+                          <span className="text-white/70">{cmd.command.replace('REQUEST_', '')}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider
+                            ${cmd.status === 'completed' || cmd.status === 'granted' || cmd.status === 'delivered' ? 'bg-green-500/20 text-green-400' : ''}
+                            ${cmd.status === 'pending' || cmd.status === 'processing' ? 'bg-yellow-500/20 text-yellow-400' : ''}
+                            ${cmd.status === 'denied' || cmd.status === 'failed' ? 'bg-red-500/20 text-red-400' : ''}
+                            ${cmd.status === 'unsupported' ? 'bg-gray-500/20 text-gray-400' : ''}
+                          `}>
+                            {cmd.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="h-px bg-white/5 mb-6" />
 
                   <h3 className="mb-6 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-blue-400">
