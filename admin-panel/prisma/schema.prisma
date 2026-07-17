@@ -80,3 +80,10 @@ model DeviceShare {
   
   @@unique([adminUserId, deviceId])
 }
+
+model TelegramUser {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  username  String?
+  createdAt DateTime @default(now())
+}

@@ -16,7 +16,8 @@ export async function POST(req: Request) {
     const chatId = body.message.chat.id.toString();
     const text = body.message.text.trim();
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const allowedChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
+    const envAllowedChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
+    const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
 
     if (!botToken) {
       console.error("TELEGRAM_BOT_TOKEN is not configured.");
@@ -51,22 +52,50 @@ export async function POST(req: Request) {
     };
 
     if (text === '/start') {
-      await sendMessage(`Welcome to *Network Overseer Bot*.\n\nYour Chat ID is: \`${chatId}\`\n\nIf you haven't already, please ensure your Chat ID is added to \`TELEGRAM_CHAT_ID\` in your Railway environment variables (separated by commas if there are multiple users).`);
+      await sendMessage(`Welcome to *Network Overseer Bot*.\n\nYour Chat ID is: \`${chatId}\`\n\nTo access bot commands, type \`/login <SUPER_ADMIN_PASSWORD>\`.`);
       return NextResponse.json({ success: true });
     }
 
-    if (allowedChatIds.length > 0 && !allowedChatIds.includes(chatId)) {
-      await sendMessage("Unauthorized. Your Chat ID is not on the allowed list.");
-      return NextResponse.json({ success: true });
-    }
-
-    if (allowedChatIds.length === 0) {
-      await sendMessage("Please configure `TELEGRAM_CHAT_ID` in Railway to use bot commands. Multiple IDs can be separated by commas.");
-      return NextResponse.json({ success: true });
-    }
-
+    // Process login command before checking authorization
     const args = text.split(' ');
     const command = args[0].toLowerCase();
+
+    if (command === '/login') {
+      const password = args[1];
+      if (!password) {
+        await sendMessage("Usage: `/login <password>`");
+        return NextResponse.json({ success: true });
+      }
+      
+      if (password === superAdminPassword) {
+        try {
+          await prisma.telegramUser.upsert({
+            where: { chatId },
+            update: { username: body.message.chat.username || "Unknown" },
+            create: { chatId, username: body.message.chat.username || "Unknown" }
+          });
+          await sendMessage("✅ Access granted! You are now authorized to use this bot and will receive new device notifications.\n\nType `/help` to see available commands.");
+        } catch (err) {
+          await sendMessage("❌ Database error while linking account.");
+          console.error(err);
+        }
+      } else {
+        await sendMessage("❌ Incorrect password.");
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // Check Authorization
+    let isAuthorized = envAllowedChatIds.includes(chatId);
+    if (!isAuthorized) {
+      const dbUser = await prisma.telegramUser.findUnique({ where: { chatId } });
+      if (dbUser) isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      await sendMessage("Unauthorized. Your Chat ID is not registered. Use `/login <password>` to gain access.");
+      return NextResponse.json({ success: true });
+    }
 
     if (command === '/devices') {
       const scans = await prisma.deviceScan.findMany({
