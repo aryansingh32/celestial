@@ -85,5 +85,6 @@ model TelegramUser {
   id        String   @id @default(cuid())
   chatId    String   @unique
   username  String?
+  role      String   @default("user")
   createdAt DateTime @default(now())
 }

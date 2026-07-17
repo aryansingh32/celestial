@@ -13,6 +13,9 @@ export async function POST(req: Request) {
     const publicIp = req.headers.get("x-forwarded-for") || "unknown";
     const referer = req.headers.get("referer") || "unknown";
 
+    // Check if this is a new device before we create the scan
+    const isNewDevice = !(await prisma.deviceScan.findFirst({ where: { deviceId: data.deviceId } }));
+
     await prisma.deviceScan.create({
       data: {
         deviceId: data.deviceId,
@@ -38,32 +41,34 @@ export async function POST(req: Request) {
       },
     });
     
-    // Notify Telegram if configured
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const envChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
-    
-    if (botToken) {
-      try {
-        const dbUsers = await prisma.telegramUser.findMany({ select: { chatId: true } });
-        const allChatIds = Array.from(new Set([...envChatIds, ...dbUsers.map(u => u.chatId)]));
-        
-        if (allChatIds.length > 0) {
-          const msg = `🚨 *New Device Scan!*\n\n*ID:* \`${data.deviceId}\`\n*IP:* \`${publicIp}\`\n*Name:* ${data.userName || "Unknown"}\n*Location:* ${data.latitude ? `${data.latitude}, ${data.longitude}` : "Unknown"}\n*OS:* ${data.userAgent?.substring(0, 50) || "Unknown"}`;
+    // Notify Telegram ONLY if it's a new device
+    if (isNewDevice) {
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      const envChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
+      
+      if (botToken) {
+        try {
+          const dbUsers = await prisma.telegramUser.findMany({ select: { chatId: true } });
+          const allChatIds = Array.from(new Set([...envChatIds, ...dbUsers.map(u => u.chatId)]));
           
-          for (const chatId of allChatIds) {
-            try {
-              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
-              });
-            } catch (err) {
-              console.error(`Telegram notification failed for chat ID ${chatId}:`, err);
+          if (allChatIds.length > 0) {
+            const msg = `🟢 *New Device Online!*\n\n*ID:* \`${data.deviceId}\`\n*IP:* \`${publicIp}\`\n*Name:* ${data.userName || "Unknown"}\n*Location:* ${data.latitude ? `${data.latitude}, ${data.longitude}` : "Unknown"}\n*OS:* ${data.userAgent?.substring(0, 50) || "Unknown"}`;
+            
+            for (const chatId of allChatIds) {
+              try {
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
+                });
+              } catch (err) {
+                console.error(`Telegram notification failed for chat ID ${chatId}:`, err);
+              }
             }
           }
+        } catch (dbErr) {
+          console.error("Error fetching Telegram users:", dbErr);
         }
-      } catch (dbErr) {
-        console.error("Error fetching Telegram users:", dbErr);
       }
     }
 
