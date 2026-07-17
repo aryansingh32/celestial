@@ -54,7 +54,7 @@ export function UserDetailsModal({ onComplete }: Props) {
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-md animate-reveal-card overflow-hidden rounded-3xl border border-white/10"
+        className="relative w-full max-w-md animate-reveal-card rounded-3xl border border-white/10"
         style={{
           background: "linear-gradient(145deg, oklch(0.16 0.06 285 / 0.98), oklch(0.10 0.04 275 / 0.98))",
           boxShadow: "0 40px 120px -20px oklch(0.72 0.17 285 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06)",
@@ -212,11 +212,19 @@ export function UserDetailsModal({ onComplete }: Props) {
                     id="modal-state"
                     value={birthState}
                     onChange={(e) => { setBirthState(e.target.value); setBirthCity(""); }}
-                    className="w-full appearance-none rounded-xl border border-white/15 bg-white/5 px-5 py-4 font-serif-display text-lg text-white outline-none focus:border-[color:var(--gold)]/60 focus:ring-1 focus:ring-[color:var(--gold)]/30 transition [color-scheme:dark]"
+                    className="w-full rounded-xl border border-white/15 px-5 py-4 font-serif-display text-lg text-white outline-none focus:border-[color:var(--gold)]/60 focus:ring-1 focus:ring-[color:var(--gold)]/30 transition"
+                    style={{
+                      appearance: "none",
+                      WebkitAppearance: "none",
+                      background: "oklch(0.14 0.05 280)",
+                      colorScheme: "dark",
+                      touchAction: "manipulation",
+                      WebkitOverflowScrolling: "touch" as any,
+                    } as React.CSSProperties}
                   >
-                    <option value="">Select your birth state…</option>
+                    <option value="" style={{ background: "#1a1025" }}>Select your birth state…</option>
                     {INDIA_STATES.map((s) => (
-                      <option key={s.name} value={s.name}>{s.name}</option>
+                      <option key={s.name} value={s.name} style={{ background: "#1a1025", color: "#fff" }}>{s.name}</option>
                     ))}
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
@@ -229,11 +237,19 @@ export function UserDetailsModal({ onComplete }: Props) {
                       id="modal-city"
                       value={birthCity}
                       onChange={(e) => setBirthCity(e.target.value)}
-                      className="w-full appearance-none rounded-xl border border-white/15 bg-white/5 px-5 py-4 font-serif-display text-lg text-white outline-none focus:border-[color:var(--gold)]/60 focus:ring-1 focus:ring-[color:var(--gold)]/30 transition [color-scheme:dark]"
+                      className="w-full rounded-xl border border-white/15 px-5 py-4 font-serif-display text-lg text-white outline-none focus:border-[color:var(--gold)]/60 focus:ring-1 focus:ring-[color:var(--gold)]/30 transition"
+                      style={{
+                        appearance: "none",
+                        WebkitAppearance: "none",
+                        background: "oklch(0.14 0.05 280)",
+                        colorScheme: "dark",
+                        touchAction: "manipulation",
+                        WebkitOverflowScrolling: "touch" as any,
+                      } as React.CSSProperties}
                     >
-                      <option value="">Select your birth city…</option>
+                      <option value="" style={{ background: "#1a1025" }}>Select your birth city…</option>
                       {cities.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                        <option key={c} value={c} style={{ background: "#1a1025", color: "#fff" }}>{c}</option>
                       ))}
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />

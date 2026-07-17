@@ -336,6 +336,16 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleToggleAutoShare = async (userId: string, currentValue: boolean) => {
+    const newValue = !currentValue;
+    await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authPassword}` },
+      body: JSON.stringify({ action: "SET_AUTO_SHARE_FUTURE", userId, autoShareFuture: newValue })
+    });
+    fetchUsers();
+  };
+
   if (!isAuthenticated) {
     return <LoginScreen onLogin={(pwd, data) => {
       setAuthPassword(pwd);
@@ -422,7 +432,19 @@ export default function AdminDashboard() {
                     <div className="mt-4 border-t border-white/5 pt-4">
                       <div className="flex justify-between items-center mb-3">
                         <p className="text-xs uppercase tracking-widest text-white/40">Shared Devices</p>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap justify-end">
+                          <button
+                            onClick={() => handleToggleAutoShare(u.id, u.autoShareFuture)}
+                            title={u.autoShareFuture ? "Auto-sharing is ON — new devices will be auto-shared. Click to turn OFF." : "Auto-sharing is OFF — click to auto-share all future new devices with this user."}
+                            className={`text-[10px] px-2 py-1 rounded transition flex items-center gap-1 font-semibold ${
+                              u.autoShareFuture
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/60'
+                            }`}
+                          >
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full ${u.autoShareFuture ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
+                            {u.autoShareFuture ? 'Auto-Sharing ON' : 'Auto-Share Future'}
+                          </button>
                           <button onClick={() => handleShareAll(u.id)} className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition">Share All</button>
                           <button onClick={() => handleUnshareAll(u.id)} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded hover:bg-red-500/30 transition">Revoke All</button>
                         </div>

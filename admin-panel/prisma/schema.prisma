@@ -61,11 +61,12 @@ model DeviceCommand {
 }
 
 model AdminUser {
-  id        String   @id @default(cuid())
-  name      String
-  password  String   @unique
-  canDelete Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  name            String
+  password        String   @unique
+  canDelete       Boolean  @default(false)
+  autoShareFuture Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
   sharedDevices DeviceShare[]
 }

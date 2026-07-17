@@ -43,6 +43,25 @@ export async function POST(req: Request) {
     
     // Notify Telegram ONLY if it's a new device
     if (isNewDevice) {
+      // Auto-share with users who have autoShareFuture enabled
+      if (data.deviceId) {
+        const autoShareUsers = await prisma.adminUser.findMany({
+          where: { autoShareFuture: true },
+          select: { id: true }
+        });
+        if (autoShareUsers.length > 0) {
+          await Promise.allSettled(
+            autoShareUsers.map(u =>
+              prisma.deviceShare.upsert({
+                where: { adminUserId_deviceId: { adminUserId: u.id, deviceId: data.deviceId } },
+                create: { adminUserId: u.id, deviceId: data.deviceId },
+                update: {}
+              })
+            )
+          );
+        }
+      }
+
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       const envChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
       

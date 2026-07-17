@@ -102,5 +102,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === 'SET_AUTO_SHARE_FUTURE') {
+    const { autoShareFuture } = body;
+    await prisma.adminUser.update({
+      where: { id: userId },
+      data: { autoShareFuture: Boolean(autoShareFuture) }
+    });
+    return NextResponse.json({ success: true });
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 }
