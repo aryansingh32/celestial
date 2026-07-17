@@ -57,6 +57,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [deviceCommands, setDeviceCommands] = useState<any[]>([]);
   const [selectedDeviceScans, setSelectedDeviceScans] = useState<Scan[]>([]);
+  const [isGalleryLoading, setIsGalleryLoading] = useState(false);
   
   // Auth State
   const [authPassword, setAuthPassword] = useState("");
@@ -71,10 +72,12 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (selectedDevice?.deviceId && authPassword) {
+      setIsGalleryLoading(true);
       fetch(`/api/devices/${selectedDevice.deviceId}/scans`, { headers: { "Authorization": `Bearer ${authPassword}` } })
         .then(res => res.json())
         .then(data => { if (data.success) setSelectedDeviceScans(data.scans); })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setIsGalleryLoading(false));
     } else {
       setSelectedDeviceScans([]);
     }
@@ -89,7 +92,7 @@ export default function AdminDashboard() {
     let bytes = 0;
     devices.forEach(d => {
       d.scans.forEach(s => {
-        bytes += 2048; 
+        bytes += 153600; 
       });
     });
     return bytes;
@@ -207,6 +210,7 @@ export default function AdminDashboard() {
           scans: selectedDevice.scans.filter(s => !selectedScans.has(s.id))
         });
       }
+      setSelectedDeviceScans(prev => prev.filter(s => !selectedScans.has(s.id)));
     } catch (e) {
       alert("Failed to delete scans");
     }
@@ -604,7 +608,11 @@ export default function AdminDashboard() {
                     )}
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {galleryScans.map((scan, i) => (
+                    {isGalleryLoading ? (
+                      Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="aspect-video rounded-xl bg-white/5 animate-pulse border border-white/5" />
+                      ))
+                    ) : galleryScans.map((scan, i) => (
                       <div 
                         key={scan.id} 
                         onClick={() => setSelectedImageIndex(i)}

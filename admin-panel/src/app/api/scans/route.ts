@@ -23,9 +23,8 @@ export async function POST(req: Request) {
     if (action === "delete") {
       if (!canDelete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       
-      await prisma.deviceScan.updateMany({
-        where: { id: { in: scanIds } },
-        data: { image: null }
+      await prisma.deviceScan.deleteMany({
+        where: { id: { in: scanIds } }
       });
       return NextResponse.json({ success: true, deletedCount: scanIds.length });
     }
