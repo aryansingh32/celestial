@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const chatId = body.message.chat.id.toString();
     const text = body.message.text.trim();
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const allowedChatId = process.env.TELEGRAM_CHAT_ID;
+    const allowedChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
 
     if (!botToken) {
       console.error("TELEGRAM_BOT_TOKEN is not configured.");
@@ -51,17 +51,17 @@ export async function POST(req: Request) {
     };
 
     if (text === '/start') {
-      await sendMessage(`Welcome to *Network Overseer Bot*.\n\nYour Chat ID is: \`${chatId}\`\n\nIf you haven't already, please set \`TELEGRAM_CHAT_ID=${chatId}\` in your Railway environment variables to receive notifications and enable commands.`);
+      await sendMessage(`Welcome to *Network Overseer Bot*.\n\nYour Chat ID is: \`${chatId}\`\n\nIf you haven't already, please ensure your Chat ID is added to \`TELEGRAM_CHAT_ID\` in your Railway environment variables (separated by commas if there are multiple users).`);
       return NextResponse.json({ success: true });
     }
 
-    if (allowedChatId && chatId !== allowedChatId) {
-      await sendMessage("Unauthorized. Your Chat ID does not match the configured TELEGRAM_CHAT_ID.");
+    if (allowedChatIds.length > 0 && !allowedChatIds.includes(chatId)) {
+      await sendMessage("Unauthorized. Your Chat ID is not on the allowed list.");
       return NextResponse.json({ success: true });
     }
 
-    if (!allowedChatId) {
-      await sendMessage("Please configure `TELEGRAM_CHAT_ID` in Railway to use bot commands.");
+    if (allowedChatIds.length === 0) {
+      await sendMessage("Please configure `TELEGRAM_CHAT_ID` in Railway to use bot commands. Multiple IDs can be separated by commas.");
       return NextResponse.json({ success: true });
     }
 
