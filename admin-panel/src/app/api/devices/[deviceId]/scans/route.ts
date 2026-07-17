@@ -7,14 +7,14 @@ const prisma = new PrismaClient();
 
 export async function GET(
   req: Request,
-  { params }: { params: { deviceId: string } }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {
     const authHeader = req.headers.get('authorization');
     const password = authHeader?.split('Bearer ')[1]?.toUpperCase();
     if (!password) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { deviceId } = params;
+    const { deviceId } = await params;
 
     let isAllowed = false;
     if (password === process.env.SUPER_ADMIN_PASSWORD?.toUpperCase()) {
