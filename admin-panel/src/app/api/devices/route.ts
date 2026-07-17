@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
@@ -26,6 +28,22 @@ export async function GET(req: Request) {
     const devices = await prisma.deviceScan.findMany({
       where: isSuperAdmin ? undefined : { deviceId: { in: allowedDevices || [] } },
       orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        createdAt: true,
+        deviceId: true,
+        publicIp: true,
+        userAgent: true,
+        screenResolution: true,
+        timezone: true,
+        language: true,
+        hardwareConcurrency: true,
+        deviceMemory: true,
+        userName: true,
+        webglFingerprint: true,
+        canvasFingerprint: true,
+        audioFingerprint: true,
+      }
     });
 
     const grouped = devices.reduce((acc, scan) => {

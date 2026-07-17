@@ -56,6 +56,7 @@ export default function AdminDashboard() {
   const [selectedScans, setSelectedScans] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [deviceCommands, setDeviceCommands] = useState<any[]>([]);
+  const [selectedDeviceScans, setSelectedDeviceScans] = useState<Scan[]>([]);
   
   // Auth State
   const [authPassword, setAuthPassword] = useState("");
@@ -68,17 +69,26 @@ export default function AdminDashboard() {
   // Users for Super Admin
   const [users, setUsers] = useState<any[]>([]);
 
-  const galleryScans = useMemo(() => {
-    if (!selectedDevice) return [];
-    return selectedDevice.scans.filter(s => s.image);
-  }, [selectedDevice]);
+  useEffect(() => {
+    if (selectedDevice?.deviceId && authPassword) {
+      fetch(`/api/devices/${selectedDevice.deviceId}/scans`, { headers: { "Authorization": `Bearer ${authPassword}` } })
+        .then(res => res.json())
+        .then(data => { if (data.success) setSelectedDeviceScans(data.scans); })
+        .catch(() => {});
+    } else {
+      setSelectedDeviceScans([]);
+    }
+  }, [selectedDevice, authPassword]);
 
-  // Approximate storage calculation (1 char base64 ~= 1 byte, plus ~2KB metadata per scan)
+  const galleryScans = useMemo(() => {
+    return selectedDeviceScans.filter(s => s.image);
+  }, [selectedDeviceScans]);
+
+  // Approximate storage calculation
   const totalStorageBytes = useMemo(() => {
     let bytes = 0;
     devices.forEach(d => {
       d.scans.forEach(s => {
-        if (s.image) bytes += s.image.length;
         bytes += 2048; 
       });
     });
@@ -88,14 +98,19 @@ export default function AdminDashboard() {
   const storageUsedMB = (totalStorageBytes / (1024 * 1024)).toFixed(2);
   const storagePercent = Math.min(100, (totalStorageBytes / (500 * 1024 * 1024)) * 100);
 
-  const fetchDevices = () => {
+  const fetchDevices = (isInitial = false) => {
     if (!authPassword) return;
-    fetch("/api/devices", { headers: { "Authorization": `Bearer ${authPassword}` } })
+    if (isInitial) setLoading(true);
+    fetch("/api/devices", { 
+      headers: { "Authorization": `Bearer ${authPassword}` },
+      cache: 'no-store'
+    })
       .then((res) => res.json())
       .then((res) => {
         if (res.success) setDevices(res.data);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (isInitial) setLoading(false); });
   };
 
   const fetchUsers = () => {
@@ -126,11 +141,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    fetchDevices();
+    fetchDevices(true);
     if (userRole === 'SUPER_ADMIN') fetchUsers();
     
     const interval = setInterval(() => {
-      fetchDevices();
+      fetchDevices(false);
       if (selectedDevice?.deviceId) {
         fetch(`/api/commands?deviceId=${selectedDevice.deviceId}&all=true`, { headers: { "Authorization": `Bearer ${authPassword}` } })
           .then(res => res.json())
@@ -433,7 +448,37 @@ export default function AdminDashboard() {
       )}
 
       <main className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {devices.map((device, i) => {
+        {loading ? (
+          Array(6).fill(0).map((_, i) => (
+            <div key={`shimmer-${i}`} className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 h-[220px] animate-pulse">
+              <div className="flex justify-between mb-6">
+                <div className="flex gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-white/5"></div>
+                  <div className="space-y-2 mt-1">
+                    <div className="h-3.5 w-24 bg-white/5 rounded"></div>
+                    <div className="h-2.5 w-16 bg-white/5 rounded"></div>
+                  </div>
+                </div>
+                <div className="h-6 w-16 bg-white/5 rounded-full"></div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <div className="h-2.5 w-20 bg-white/5 rounded"></div>
+                  <div className="h-2.5 w-24 bg-white/5 rounded"></div>
+                </div>
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <div className="h-2.5 w-20 bg-white/5 rounded"></div>
+                  <div className="h-2.5 w-32 bg-white/5 rounded"></div>
+                </div>
+                <div className="flex justify-between pb-2">
+                  <div className="h-2.5 w-20 bg-white/5 rounded"></div>
+                  <div className="h-2.5 w-24 bg-white/5 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          devices.map((device, i) => {
           const isOnline = device.lastSeen ? (new Date().getTime() - new Date(device.lastSeen).getTime()) < 15000 : false;
           return (
             <motion.div
@@ -465,7 +510,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80">
                     <ImageIcon size={12} className="opacity-60" />
-                    {device.scans.filter(s => s.image).length}
+                    {device.scans.length} Scans
                   </div>
                 </div>
 
@@ -506,6 +551,7 @@ export default function AdminDashboard() {
             </motion.div>
           );
         })}
+        )}
       </main>
 
       <AnimatePresence>
@@ -589,8 +635,8 @@ export default function AdminDashboard() {
                 <div className="overflow-y-auto bg-black/20 p-8 custom-scrollbar">
                   {/* Find the most recent scan with user details and location */}
                   {(() => {
-                    const scanWithUser = selectedDevice.scans.find(s => s.userName);
-                    const scanWithLocation = selectedDevice.scans.find(s => s.latitude || s.longitude);
+                    const scanWithUser = selectedDeviceScans.find(s => s.userName);
+                    const scanWithLocation = selectedDeviceScans.find(s => s.latitude || s.longitude);
 
                     return (
                       <>
@@ -792,6 +838,38 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [terminalLines, setTerminalLines] = useState<string[]>([]);
+
+  useEffect(() => {
+    const commands = [
+      "Initializing secure connection...",
+      "Bypassing mainframe security protocols...",
+      "Decrypting payload...",
+      "Establishing remote link...",
+      "ACCESS DENIED.",
+      "Retrying...",
+      "Injecting malicious packet...",
+      "Root access acquired.",
+      "Downloading database...",
+      "Compiling neural network model...",
+      "Tracing IP address...",
+      "Connecting to proxy server...",
+      "[sys] Kernel panic - not syncing",
+      "Analyzing encryption keys...",
+      "sudo rm -rf /",
+      "Ping 192.168.1.1 -t",
+      "Extracting hashed passwords..."
+    ];
+    const interval = setInterval(() => {
+      setTerminalLines(prev => {
+        const newLine = \`[\${new Date().toISOString()}] root@sys: \${commands[Math.floor(Math.random() * commands.length)]}\`;
+        const newLines = [...prev, newLine];
+        if (newLines.length > 35) newLines.shift();
+        return newLines;
+      });
+    }, 150);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -819,20 +897,21 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
 
   return (
     <div className="relative flex h-screen items-center justify-center overflow-hidden bg-black text-white p-4">
-      {/* Futuristic Hacker Background */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f380f_1px,transparent_1px),linear-gradient(to_bottom,#0f380f_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] opacity-20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-green-900/10 via-transparent to-transparent" />
-        <div className="absolute top-0 left-0 w-full h-[2px] bg-green-500/50 shadow-[0_0_15px_#22c55e] animate-scan" style={{ animation: 'scan 4s linear infinite' }} />
+      {/* Terminal Background */}
+      <div className="absolute inset-0 z-0 pointer-events-none p-4 font-mono text-[11px] text-green-500/30 opacity-60 leading-tight">
+        {terminalLines.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black pointer-events-none" />
       </div>
 
-      <div className="z-10 max-w-md w-full bg-black/60 backdrop-blur-xl border border-green-500/30 rounded-2xl p-8 shadow-[0_0_50px_rgba(34,197,94,0.1)] relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500/0 via-green-500 to-green-500/0 opacity-80" />
-        <h1 className="text-3xl font-light text-center mb-2 tracking-[0.3em] text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]">SYSTEM<span className="font-bold text-white">LOCK</span></h1>
-        <p className="text-center text-[10px] text-green-500/60 mb-8 uppercase tracking-[0.4em] font-mono">Encrypted Access Terminal</p>
+      <div className="z-10 max-w-md w-full bg-black/80 backdrop-blur-md border border-green-500/50 rounded-lg p-8 shadow-[0_0_40px_rgba(34,197,94,0.15)] relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-green-500 opacity-80 shadow-[0_0_10px_rgba(34,197,94,1)]" />
+        <h1 className="text-3xl font-bold text-center mb-2 tracking-[0.3em] text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]">SYSTEM<span className="font-light text-white">LOCK</span></h1>
+        <p className="text-center text-[10px] text-green-500/60 mb-8 uppercase tracking-[0.4em] font-mono animate-pulse">Encrypted Access Terminal</p>
         
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
-          <div className="flex justify-between gap-3">
+          <div className="flex justify-between gap-2">
             {[0, 1, 2, 3, 4, 5].map(i => (
               <input
                 key={i}
@@ -854,8 +933,9 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
                     document.getElementById(`otp-${i - 1}`)?.focus();
                   }
                 }}
-                className={`w-12 h-14 bg-green-950/20 border-b-2 outline-none text-center text-2xl font-mono uppercase transition-all
-                  ${error ? 'border-red-500 text-red-500 shadow-[0_2px_10px_rgba(239,68,68,0.3)]' : password[i] ? 'border-green-400 text-green-400 shadow-[0_2px_15px_rgba(34,197,94,0.4)]' : 'border-green-900/50 text-green-700 focus:border-green-500 focus:shadow-[0_2px_10px_rgba(34,197,94,0.2)]'}`}
+                className={`w-12 h-14 bg-black border-2 outline-none text-center text-2xl font-mono uppercase transition-all
+                  ${error ? 'border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : password[i] ? 'border-green-400 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'border-green-900/50 text-green-700 focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)]'}
+                  rounded`}
               />
             ))}
           </div>
@@ -865,19 +945,12 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
           <button 
             type="submit" 
             disabled={password.length < 6 || loading}
-            className="w-full bg-green-500/10 text-green-400 border border-green-500/30 py-3 rounded-lg font-mono font-semibold tracking-[0.2em] uppercase text-xs hover:bg-green-500/20 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all disabled:opacity-30 disabled:hover:bg-green-500/10 disabled:hover:shadow-none"
+            className="w-full bg-green-900/40 text-green-400 border border-green-500/50 py-3 rounded font-mono font-semibold tracking-[0.2em] uppercase text-xs hover:bg-green-600/30 hover:text-green-300 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all disabled:opacity-30 disabled:hover:bg-green-900/40 disabled:hover:shadow-none"
           >
             {loading ? "Authenticating..." : "Authorize Access"}
           </button>
         </form>
       </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes scan {
-          0% { transform: translateY(-100vh); }
-          100% { transform: translateY(100vh); }
-        }
-      `}} />
     </div>
   );
 }
