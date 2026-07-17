@@ -862,7 +862,7 @@ function LoginScreen({ onLogin }: { onLogin: (password: string, data: any) => vo
     ];
     const interval = setInterval(() => {
       setTerminalLines(prev => {
-        const newLine = \`[\${new Date().toISOString()}] root@sys: \${commands[Math.floor(Math.random() * commands.length)]}\`;
+        const newLine = `[${new Date().toISOString()}] root@sys: ${commands[Math.floor(Math.random() * commands.length)]}`;
         const newLines = [...prev, newLine];
         if (newLines.length > 35) newLines.shift();
         return newLines;
