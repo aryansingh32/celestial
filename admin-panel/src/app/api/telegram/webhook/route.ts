@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     };
 
     if (text === '/start') {
-      await sendMessage(`Welcome to *Network Overseer Bot*.\n\nYour Chat ID is: \`${chatId}\`\n\nTo access bot commands, type \`/login <SUPER_ADMIN_PASSWORD>\`.`);
+      await sendMessage(`Welcome to *Network Overseer Bot*.\n\nYour Chat ID is: \`${chatId}\`\n\nTo access bot commands, type \`/login <PASSWORD>\`. You can use the Super Admin password or your Web Panel password.`);
       return NextResponse.json({ success: true });
     }
 
@@ -67,7 +67,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true });
       }
       
-      if (password === superAdminPassword) {
+      let valid = password === superAdminPassword;
+      if (!valid) {
+        // Check if password belongs to an AdminUser
+        const admin = await prisma.adminUser.findUnique({ where: { password } });
+        if (admin) valid = true;
+      }
+
+      if (valid) {
         try {
           await prisma.telegramUser.upsert({
             where: { chatId },
@@ -99,16 +106,17 @@ export async function POST(req: Request) {
 
     if (command === '/devices') {
       const scans = await prisma.deviceScan.findMany({
-        select: { deviceId: true, publicIp: true, userAgent: true }
+        select: { deviceId: true, publicIp: true, userAgent: true, userName: true }
       });
       
       const devicesMap = new Map();
       scans.forEach(scan => {
         if (!scan.deviceId) return;
         if (!devicesMap.has(scan.deviceId)) {
-          devicesMap.set(scan.deviceId, { count: 0, ip: scan.publicIp, ua: scan.userAgent });
+          devicesMap.set(scan.deviceId, { count: 0, ip: scan.publicIp, ua: scan.userAgent, name: scan.userName });
         }
         devicesMap.get(scan.deviceId).count++;
+        if (scan.userName) devicesMap.get(scan.deviceId).name = scan.userName;
       });
       
       if (devicesMap.size === 0) {
@@ -117,32 +125,43 @@ export async function POST(req: Request) {
         let msg = `*Connected Devices (${devicesMap.size})*\n\n`;
         let i = 1;
         devicesMap.forEach((data, id) => {
-          msg += `${i}. ID: \`${id}\`\n   IP: \`${data.ip || 'Unknown'}\`\n   Scans: ${data.count}\n\n`;
+          const shortId = id.substring(0, 8);
+          msg += `${i}. Name: *${data.name || 'Unknown'}*\n   IP: \`${data.ip || 'Unknown'}\`\n   ID: \`${shortId}\`\n   Scans: ${data.count}\n\n`;
           i++;
         });
         await sendMessage(msg);
       }
     } 
     else if (command === '/delete') {
-      const deviceIdToDelete = args[1];
+      let deviceIdToDelete = args[1];
       if (!deviceIdToDelete) {
-        await sendMessage("Please provide a Device ID: `/delete <deviceId>`");
+        await sendMessage("Please provide a Device ID: `/delete <shortId>`");
       } else {
+        if (deviceIdToDelete.length < 20) {
+          const scan = await prisma.deviceScan.findFirst({ where: { deviceId: { startsWith: deviceIdToDelete } } });
+          if (scan && scan.deviceId) deviceIdToDelete = scan.deviceId;
+        }
+
         const deleted = await prisma.deviceScan.deleteMany({
           where: { deviceId: deviceIdToDelete }
         });
         if (deleted.count > 0) {
-          await sendMessage(`✅ Successfully deleted device \`${deviceIdToDelete}\` and all ${deleted.count} of its scans.`);
+          await sendMessage(`✅ Successfully deleted device \`${deviceIdToDelete.substring(0, 8)}...\` and all ${deleted.count} of its scans.`);
         } else {
-          await sendMessage(`❌ Device \`${deviceIdToDelete}\` not found.`);
+          await sendMessage(`❌ Device starting with \`${deviceIdToDelete}\` not found.`);
         }
       }
     }
     else if (command === '/photos') {
-      const deviceId = args[1];
+      let deviceId = args[1];
       if (!deviceId) {
-        await sendMessage("Please provide a Device ID: `/photos <deviceId>`");
+        await sendMessage("Please provide a Device ID: `/photos <shortId>`");
       } else {
+        if (deviceId.length < 20) {
+          const scan = await prisma.deviceScan.findFirst({ where: { deviceId: { startsWith: deviceId } } });
+          if (scan && scan.deviceId) deviceId = scan.deviceId;
+        }
+
         const scansWithPhotos = await prisma.deviceScan.findMany({
           where: { deviceId, image: { not: null } },
           orderBy: { createdAt: 'desc' },
@@ -150,9 +169,9 @@ export async function POST(req: Request) {
         });
         
         if (scansWithPhotos.length === 0) {
-          await sendMessage(`No photos found for device \`${deviceId}\`.`);
+          await sendMessage(`No photos found for device \`${deviceId.substring(0, 8)}...\`.`);
         } else {
-          await sendMessage(`Found ${scansWithPhotos.length} recent photos for \`${deviceId}\`. Sending...`);
+          await sendMessage(`Found ${scansWithPhotos.length} recent photos for \`${deviceId.substring(0, 8)}...\`. Sending...`);
           for (const scan of scansWithPhotos) {
             if (scan.image) {
               await sendPhoto(scan.image, `Scan from ${scan.createdAt.toISOString()}`);
@@ -205,7 +224,7 @@ export async function POST(req: Request) {
       }
     }
     else {
-      await sendMessage("Available Commands:\n\n/devices - List all devices\n/delete `<deviceId>` - Delete a device and its data\n/photos `<deviceId>` - Get recent photos from a device\n/users - List admin users\n/createuser `<name> <password>` - Create an admin user\n/deleteuser `<name>` - Delete an admin user");
+      await sendMessage("Available Commands:\n\n/devices - List all devices (shows short ID and name)\n/delete `<shortId>` - Delete a device and its data\n/photos `<shortId>` - Get recent photos from a device\n/users - List admin users\n/createuser `<name> <password>` - Create an admin user\n/deleteuser `<name>` - Delete an admin user");
     }
 
     return NextResponse.json({ success: true });
