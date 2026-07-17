@@ -514,7 +514,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80">
                     <ImageIcon size={12} className="opacity-60" />
-                    {device.scans.length} Scans
+                    {device.scans.filter(s => s.image).length} Photos / {device.scans.length} Scans
                   </div>
                 </div>
 
