@@ -145,7 +145,7 @@ export async function POST(req: Request) {
       if (devicesMap.size === 0) {
         await sendMessage("No devices found in the database.");
       } else {
-        let buttons = [];
+        let buttons: any[] = [];
         devicesMap.forEach((data, id) => {
           const shortId = id.substring(0, 8);
           buttons.push([{ text: `🖥️ ${data.name || data.ip} (${data.count} scans)`, callback_data: `menu_${shortId}` }]);
