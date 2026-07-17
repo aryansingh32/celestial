@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { PalmScanner } from "@/components/PalmScanner";
 import { ScanAnimation } from "@/components/ScanAnimation";
@@ -19,10 +19,13 @@ export type NeighbourhoodReading = {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Celestial Touch — Vedic Palm Reading" },
-      { name: "description", content: "Discover your destiny through an immersive AI-powered Vedic palm and kundali reading experience." },
-      { property: "og:title", content: "Celestial Touch — Vedic Palm Reading" },
-      { property: "og:description", content: "An immersive, AI-powered Vedic kundali and palm reading. Place your palm inside the frame and let the ancient patterns speak." },
+      { title: "Celestial Touch — AI Vedic Palm Reading" },
+      { name: "description", content: "An entertainment app offering AI-powered Vedic palm and kundali readings for fun. Discover your destiny through ancient wisdom and modern AI." },
+      { name: "robots", content: "index, follow" },
+      { name: "rating", content: "general" },
+      { name: "classification", content: "Entertainment" },
+      { property: "og:title", content: "Celestial Touch — AI Vedic Palm Reading" },
+      { property: "og:description", content: "An immersive, AI-powered Vedic kundali and palm reading for entertainment. Place your palm inside the frame and let the ancient patterns speak." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -241,6 +244,17 @@ function Index() {
           </div>
         </div>
       )}
+      {/* Privacy footer — always visible, helps scanners identify legitimate site */}
+      <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-3 py-2 pointer-events-none">
+        <Link
+          to="/privacy"
+          className="pointer-events-auto font-sans-ui text-[10px] text-white/25 hover:text-white/50 transition"
+        >
+          Privacy Policy
+        </Link>
+        <span className="text-white/15 text-[10px]">·</span>
+        <span className="font-sans-ui text-[10px] text-white/20">Entertainment purposes only</span>
+      </footer>
     </main>
   );
 }

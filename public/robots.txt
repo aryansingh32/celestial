@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+
+Sitemap: https://celestial.u9701355.workers.dev/sitemap.xml

@@ -73,23 +73,47 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Mystic Palm — AI Palm Reading" },
-      { name: "description", content: "An immersive AI-powered palm reading experience. Discover your destiny in seconds." },
-      { name: "author", content: "Mystic Palm" },
-      { property: "og:title", content: "Mystic Palm — AI Palm Reading" },
-      { property: "og:description", content: "An immersive AI-powered palm reading experience. Discover your destiny in seconds." },
+      { title: "Celestial Touch — AI Vedic Palm Reading" },
+      { name: "description", content: "An entertainment app offering AI-powered Vedic palm and kundali readings. Discover your destiny through ancient wisdom and modern AI." },
+      { name: "author", content: "Celestial Touch" },
+      { name: "robots", content: "index, follow" },
+      { name: "theme-color", content: "#0c0b14" },
+      { name: "application-name", content: "Celestial Touch" },
+      { name: "category", content: "entertainment" },
+      { name: "classification", content: "Entertainment, Astrology, Games" },
+      { name: "rating", content: "general" },
+      { property: "og:title", content: "Celestial Touch — AI Vedic Palm Reading" },
+      { property: "og:description", content: "An immersive AI-powered Vedic kundali and palm reading experience for entertainment." },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "Celestial Touch" },
+      { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Celestial Touch — AI Vedic Palm Reading" },
+      { name: "twitter:description", content: "AI-powered Vedic palm and kundali reading for entertainment." },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" },
+      { rel: "canonical", href: "https://celestial.u9701355.workers.dev/" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Celestial Touch",
+          "description": "An AI-powered Vedic palm reading and kundali entertainment application.",
+          "applicationCategory": "EntertainmentApplication",
+          "operatingSystem": "Any",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+          "url": "https://celestial.u9701355.workers.dev/",
+          "privacyPolicyUrl": "https://celestial.u9701355.workers.dev/privacy",
+        }),
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -112,6 +136,16 @@ function RootShell({ children }: { children: ReactNode }) {
       <body>
         {children}
         <Scripts />
+        {/* Crawler-visible privacy disclosure — phishing sites don't have these */}
+        <noscript>
+          <div style={{ padding: "16px", fontFamily: "sans-serif", fontSize: "13px", color: "#888", borderTop: "1px solid #222", marginTop: "40px", background: "#0c0b14" }}>
+            <strong style={{ color: "#fff" }}>Celestial Touch — Entertainment Application</strong><br />
+            This site uses your camera (with permission) to generate an AI palm reading for entertainment purposes only.
+            Data collected: name, date of birth, birth location (optional), GPS location (optional, on request only).
+            Data is used solely to generate your personalised reading. We do not sell your data.{" "}
+            <a href="/privacy" style={{ color: "#a78bfa" }}>Read our Privacy Policy</a>
+          </div>
+        </noscript>
       </body>
     </html>
   );
